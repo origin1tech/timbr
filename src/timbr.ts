@@ -53,17 +53,13 @@ export class TimbrInstance extends EventEmitter {
 
     // Normalizes when custom.
     this._levels = levels;
-    this.normalizeLevels(levels);
+    this.normalizeLevels();
 
     if (isDebug() && this.options.debugAuto) {
       const debugLevel = this.options.debugLevel;
       if (~levels.indexOf(<string>debugLevel))
         this.options.level = <string>debugLevel;
     }
-
-    // Convert level index to text.
-    if (isNumber(this.options.level))
-      this.options.level = this.indexToLevel(this.options.level as number);
 
     if (this.options.errorCapture)
       this.toggleExceptionHandler(true);
@@ -89,10 +85,9 @@ export class TimbrInstance extends EventEmitter {
    *
    * @param levels custom log levels if provided.
    */
-  private normalizeLevels(levels: string[]) {
+  private normalizeLevels() {
 
-    if (!levels.length)
-      return;
+    const levels = this._levels;
 
     const baseStyles: any = [
       'red',
@@ -104,9 +99,18 @@ export class TimbrInstance extends EventEmitter {
       'gray'
     ];
 
+    let level: any = this.options.level;
     const debugLevel = this.options.debugLevel;
     const errorLevel = this.options.errorLevel;
     const exitLevel = this.options.errorExit;
+
+    let tmpLevel = level;
+    if (isNumber(level))
+      tmpLevel = levels[level] || 'info';
+
+    if (!~levels.indexOf(tmpLevel))
+      tmpLevel = last(levels);
+    level = this.options.level = tmpLevel;
 
     // ensure debug level.
     if (!~levels.indexOf(debugLevel))
@@ -116,26 +120,11 @@ export class TimbrInstance extends EventEmitter {
     if (!~levels.indexOf(errorLevel))
       this.options.errorLevel = first(this._levels);
 
-    // ensure active level.
-    this.options.level = this.indexToLevel(this.options.level as number, levels);
-
     levels.forEach((l, i) => {
       if (!this.options.styles[l])
         this.options.styles[l] = baseStyles[i] || (Math.floor(Math.random() * 6) + 1);
     });
 
-  }
-
-  /**
-   * Index To level
-   * Internal method to convert log level index to string.
-   *
-   * @param index the index of the log level.
-   */
-  private indexToLevel(index: number, levels?: string[]) {
-    levels = levels || this._levels;
-    const defLevel = levels.length ? last(levels) : 'info'; // get last if custom levels.
-    return levels[index] || defLevel;
   }
 
   /**

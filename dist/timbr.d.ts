@@ -14,14 +14,7 @@ export declare class TimbrInstance extends EventEmitter {
      *
      * @param levels custom log levels if provided.
      */
-    private normalizeLevels(levels);
-    /**
-     * Index To level
-     * Internal method to convert log level index to string.
-     *
-     * @param index the index of the log level.
-     */
-    private indexToLevel(index, levels?);
+    private normalizeLevels();
     /**
      * Get Index
      * Gets the index of a value in an array.

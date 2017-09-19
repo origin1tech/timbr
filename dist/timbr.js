@@ -55,15 +55,12 @@ var TimbrInstance = /** @class */ (function (_super) {
         _this.options = chek_1.extend({}, DEFAULTS, options);
         // Normalizes when custom.
         _this._levels = levels;
-        _this.normalizeLevels(levels);
+        _this.normalizeLevels();
         if (chek_1.isDebug() && _this.options.debugAuto) {
             var debugLevel = _this.options.debugLevel;
             if (~levels.indexOf(debugLevel))
                 _this.options.level = debugLevel;
         }
-        // Convert level index to text.
-        if (chek_1.isNumber(_this.options.level))
-            _this.options.level = _this.indexToLevel(_this.options.level);
         if (_this.options.errorCapture)
             _this.toggleExceptionHandler(true);
         _this.stream = _this.options.stream || process.stdout;
@@ -83,10 +80,9 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param levels custom log levels if provided.
      */
-    TimbrInstance.prototype.normalizeLevels = function (levels) {
+    TimbrInstance.prototype.normalizeLevels = function () {
         var _this = this;
-        if (!levels.length)
-            return;
+        var levels = this._levels;
         var baseStyles = [
             'red',
             'yellow',
@@ -96,32 +92,26 @@ var TimbrInstance = /** @class */ (function (_super) {
             'magenta',
             'gray'
         ];
+        var level = this.options.level;
         var debugLevel = this.options.debugLevel;
         var errorLevel = this.options.errorLevel;
         var exitLevel = this.options.errorExit;
+        var tmpLevel = level;
+        if (chek_1.isNumber(level))
+            tmpLevel = levels[level] || 'info';
+        if (!~levels.indexOf(tmpLevel))
+            tmpLevel = chek_1.last(levels);
+        level = this.options.level = tmpLevel;
         // ensure debug level.
         if (!~levels.indexOf(debugLevel))
             this.options.debugLevel = chek_1.last(this._levels);
         // ensure error level
         if (!~levels.indexOf(errorLevel))
             this.options.errorLevel = chek_1.first(this._levels);
-        // ensure active level.
-        this.options.level = this.indexToLevel(this.options.level, levels);
         levels.forEach(function (l, i) {
             if (!_this.options.styles[l])
                 _this.options.styles[l] = baseStyles[i] || (Math.floor(Math.random() * 6) + 1);
         });
-    };
-    /**
-     * Index To level
-     * Internal method to convert log level index to string.
-     *
-     * @param index the index of the log level.
-     */
-    TimbrInstance.prototype.indexToLevel = function (index, levels) {
-        levels = levels || this._levels;
-        var defLevel = levels.length ? chek_1.last(levels) : 'info'; // get last if custom levels.
-        return levels[index] || defLevel;
     };
     /**
      * Get Index
