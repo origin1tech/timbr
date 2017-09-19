@@ -1,0 +1,306 @@
+<!doctype html>
+<html class="default no-js">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>App</title>
+	<meta name="description" content="">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<header>
+	<div class="tsd-page-toolbar">
+		<div class="container">
+			<div class="table-wrap">
+				<div class="table-cell" id="tsd-search" data-index="assets/js/search.js" data-base=".">
+					<div class="field">
+						<label for="tsd-search-field" class="tsd-widget search no-caption">Search</label>
+						<input id="tsd-search-field" type="text" />
+					</div>
+					<ul class="results">
+						<li class="state loading">Preparing search index...</li>
+						<li class="state failure">The search index is not available</li>
+					</ul>
+					<a href="index.html" class="title">App</a>
+				</div>
+				<div class="table-cell" id="tsd-widgets">
+					<div id="tsd-filter">
+						<a href="#" class="tsd-widget options no-caption" data-toggle="options">Options</a>
+						<div class="tsd-filter-group">
+							<div class="tsd-select" id="tsd-filter-visibility">
+								<span class="tsd-select-label">All</span>
+								<ul class="tsd-select-list">
+									<li data-value="public">Public</li>
+									<li data-value="protected">Public/Protected</li>
+									<li data-value="private" class="selected">All</li>
+								</ul>
+							</div>
+							<input type="checkbox" id="tsd-filter-inherited" checked />
+							<label class="tsd-widget" for="tsd-filter-inherited">Inherited</label>
+							<input type="checkbox" id="tsd-filter-externals" checked />
+							<label class="tsd-widget" for="tsd-filter-externals">Externals</label>
+							<input type="checkbox" id="tsd-filter-only-exported" />
+							<label class="tsd-widget" for="tsd-filter-only-exported">Only exported</label>
+						</div>
+					</div>
+					<a href="#" class="tsd-widget menu no-caption" data-toggle="menu">Menu</a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="tsd-page-title">
+		<div class="container">
+			<ul class="tsd-breadcrumb">
+				<li>
+					<a href="globals.html">Globals</a>
+				</li>
+			</ul>
+			<h1> App</h1>
+		</div>
+	</div>
+</header>
+<div class="container container-main">
+	<div class="row">
+		<div class="col-8 col-content">
+			<div class="tsd-panel tsd-typography">
+				<h1 id="timbr">Timbr</h1>
+				<p>Minimalistic logger that accepts custom stream and supports event emitter. Timbr supports error, warn, info, debug, write and exit methods. Log events may contain strings with format arguments, metadata objects and/or instances of an Error.</p>
+				<h2 id="installation">Installation</h2>
+				<pre><code class="lang-sh">$ npm install timbr
+</code></pre>
+				<p>OR</p>
+				<pre><code class="lang-sh">$ npm install timbr --production
+</code></pre>
+				<h2 id="quick-start">Quick Start</h2>
+				<p>Require or import</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">import</span> { Timbr } <span class="hljs-keyword">from</span> <span class="hljs-string">'timbr'</span>;
+<span class="hljs-keyword">const</span> log = <span class="hljs-keyword">new</span> Timbr({ level: <span class="hljs-string">'info'</span> });
+log.info(<span class="hljs-string">'some message.'</span>);
+</code></pre>
+				<p>OR</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">const</span> Timbr = <span class="hljs-built_in">require</span>(<span class="hljs-string">'timbr'</span>).Timbr;
+<span class="hljs-keyword">const</span> log = <span class="hljs-keyword">new</span> Timbr(<span class="hljs-comment">/* options */</span>);
+log.warn(<span class="hljs-string">'some warning.'</span>);
+</code></pre>
+				<h4 id="custom-levels">Custom Levels</h4>
+				<p>In order to create custom log levels you must specify each level in the order of worse to least in severity. Meaning errors would be 0 with debug type levels at the highest.</p>
+				<p>Timbr will try to automatically pick the <strong>errorLevel</strong>, <strong>debugLevel</strong> based on the provided custom levels. Timbr will also try to automatically pick colors based on severity or choose a random color. If you wish to provide your own ansi styles you may do so in the <strong>options.styles</strong> property. Style keys should match the levels you provided in the Timbr constructor. Styles may be strings or arrays of strings. For valid styles you can import <strong>AnsiStyles</strong> when using TypeScript.</p>
+				<p>Below example uses <strong>syslog</strong> levels.</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">import</span> { Timbr } <span class="hljs-keyword">from</span> <span class="hljs-string">'timbr'</span>;
+<span class="hljs-keyword">const</span> log = <span class="hljs-keyword">new</span> Timbr(<span class="hljs-comment">/* options or null */</span>, <span class="hljs-string">'EMERGENCY'</span>, <span class="hljs-string">'ALERT'</span>, <span class="hljs-string">'CRITICAL'</span>, <span class="hljs-string">'ERROR'</span>, <span class="hljs-string">'WARNING'</span>, <span class="hljs-string">'NOTICE'</span>, <span class="hljs-string">'INFO'</span>, <span class="hljs-string">'DEBUG'</span>);
+</code></pre>
+				<h2 id="log-levels">Log Levels</h2>
+				<p>Timbr supports the following log methods by default.</p>
+				<ul>
+					<li><strong>error</strong> - outputs when level is higher than or equal to error.</li>
+					<li><strong>warn</strong> - outputs when level is higher than or equal to warn.</li>
+					<li><strong>info</strong> - the default level, outputs when level is higher than or equal to info.</li>
+					<li><strong>trace</strong> - the default level, outputs when level is higher than or equal to trace.</li>
+					<li><strong>debug</strong> - outputs when level is higher than or equal to debug or node is in debug mode.</li>
+				</ul>
+				<p>Additionally a write method which allows you to take advantage of Timbr&#39;s formatting but directly outputs to the stream. There is also an exit method when used with chaining allows you to easily exit after logging any log level type if desired.</p>
+				<ul>
+					<li><strong>write</strong> - supports formatting but directly outputs to stream.</li>
+					<li><strong>exit</strong> - immediately exits the process.</li>
+				</ul>
+				<h2 id="logging-messages">Logging Messages</h2>
+				<p>A few logging examples.</p>
+				<h4 id="using-formatting">Using Formatting</h4>
+				<pre><code class="lang-ts">log.warn(<span class="hljs-string">'expected value to be of type %s'</span>, <span class="hljs-string">'number'</span>);
+</code></pre>
+				<h4 id="logging-metadata">Logging Metadata</h4>
+				<pre><code class="lang-ts">log.debug(<span class="hljs-string">'starting server...'</span>, { host: <span class="hljs-string">'localhost'</span>, port: <span class="hljs-number">1337</span> });
+</code></pre>
+				<h4 id="logging-error">Logging Error</h4>
+				<pre><code class="lang-ts">log.error(<span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">'Whoops you can\'t do that!'</span>));
+</code></pre>
+				<h4 id="log-exit">Log &amp; Exit</h4>
+				<pre><code class="lang-ts">log.info(<span class="hljs-string">'just some important message.'</span>).exit();
+</code></pre>
+				<h4 id="log-wrap">Log &amp; Wrap</h4>
+				<p>Writes &quot;----&quot; before and after log message.</p>
+				<pre><code class="lang-ts">log
+  .write(<span class="hljs-string">'----'</span>)
+  .info(<span class="hljs-string">'just some important message.'</span>)
+  .write(<span class="hljs-string">'----'</span>);
+</code></pre>
+				<h4 id="debuggers">Debuggers</h4>
+				<p>The following will only output when the &quot;server&quot; debug group is active. By default if no debuggers are active the first debugger created will be activated.</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">const</span> serverDebug = log.debugger(<span class="hljs-string">'server'</span>); <span class="hljs-comment">// create the grouped debugger.</span>
+
+serverDebug.debug(<span class="hljs-string">'some debug message for %s'</span>, <span class="hljs-string">'server'</span>);
+
+serverDebug.enable(); <span class="hljs-comment">// enables the debugger.</span>
+
+serverDebug.disable() <span class="hljs-comment">// disables the debugger.</span>
+
+<span class="hljs-keyword">const</span> enabledDebug = log.debugger(<span class="hljs-string">'posts'</span>, <span class="hljs-literal">true</span>) <span class="hljs-comment">// creates and ensures enabled.</span>
+
+<span class="hljs-keyword">const</span> disabledDebug = log.debugger(<span class="hljs-string">'puts'</span>, <span class="hljs-literal">false</span>) <span class="hljs-comment">// creates and ensures disabled.</span>
+</code></pre>
+				<h2 id="advanced-usage">Advanced Usage</h2>
+				<p>Getting and setting options as well as using the event emitter.</p>
+				<h4 id="get-option">Get Option</h4>
+				<p>Gets the timestamp format.</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">const</span> tsFormat = log.get(<span class="hljs-string">'timestamp'</span>);
+</code></pre>
+				<h4 id="set-option">Set Option</h4>
+				<p>Sets the timestamp format false disabling it from log messages.</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">const</span> tsFormat = log.set(<span class="hljs-string">'timestamp'</span>, <span class="hljs-literal">false</span>);
+</code></pre>
+				<h4 id="event-emitter">Event Emitter</h4>
+				<p>The Event Emitter callback returns the following arguments.</p>
+				<ul>
+					<li><strong>timestamp</strong> - the timestamp.</li>
+					<li><strong>type</strong> - the type of message that was logged.</li>
+					<li><strong>message</strong> - the log message</li>
+					<li><strong>meta</strong> - any metadata objects.</li>
+					<li><strong>args</strong> - the source arguments.</li>
+					<li><strong>error</strong> - instance of Error if present.</li>
+					<li><strong>stackTrace</strong> - the stack trace.</li>
+				</ul>
+				<pre><code class="lang-ts">log.on(<span class="hljs-string">'logged'</span>, <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">type</span>, msg, meta, data</span>) =&gt;</span> {
+  <span class="hljs-comment">// do something</span>
+})
+</code></pre>
+				<p>You can also listen for specific log events. Error, warn, info and debug are supported.</p>
+				<pre><code class="lang-ts">log.on(<span class="hljs-string">'logged:info'</span>, <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">type</span>, msg, meta, data</span>) =&gt;</span> {
+  <span class="hljs-comment">// do something</span>
+})
+</code></pre>
+				<h2 id="options">Options</h2>
+				<table>
+					<thead>
+						<tr><th><strong>Option</strong></th><th><strong>Description</strong></th><th><strong>Type</strong></th><th><strong>Default</strong></th></tr>
+					</thead>
+					<tbody>
+						<tr><td>stream</td><td>stream to output to.</td><td>WriteableStream</td><td>process.stdout</td></tr>
+						<tr><td>level</td><td>active log level.</td><td>string | number</td><td>info</td></tr>
+						<tr><td>colorize</td><td>enables/disables colors.</td><td>boolean</td><td>true</td></tr>
+						<tr><td>errorExit</td><td>when true exits on errors.</td><td>boolean</td><td>false</td></tr>
+						<tr><td>errorCapture</td><td>capture uncaught exceptions.</td><td>boolean</td><td>false</td></tr>
+						<tr><td>errorConvert</td><td>if first arg Error instance convet to error log level.</td><td>boolean</td><td>false</td></tr>
+						<tr><td>errorLevel</td><td>the error level name.</td><td>string</td><td>error</td></tr>
+						<tr><td>stackTrace</td><td>when true full stack trace shown on errors.</td><td>boolean</td><td>true</td></tr>
+						<tr><td>stackDepth</td><td>depth of stack trace to display.</td><td>number</td><td>2</td></tr>
+						<tr><td>prettyStack</td><td>when true stack trace is formated output as object.</td><td>boolean</td><td>false</td></tr>
+						<tr><td>miniStack</td><td>when true file, line &amp; column shown on all messages.</td><td>boolean</td><td>true</td></tr>
+						<tr><td>timestamp</td><td>enables/disables or defines timestamp type.</td><td>boolean | time | datetime</td><td>time</td></tr>
+						<tr><td>debugLevel</td><td>the log level used for debugging</td><td>string</td><td>debug</td></tr>
+						<tr><td>debuggers</td><td>array of active debuggers</td><td>string | string[]</td><td>[]</td></tr>
+						<tr><td>enabled</td><td>initialize as enabled or disabled.</td><td>boolean</td><td>true</td></tr>
+						<tr>
+							<td>colors</td>
+							<td colspan="2">
+								<table>
+									<tr><td>error</td><td>string | string[]</td><td>[bold, underline, red]</td></tr>
+									<tr><td>warn</td><td>string | string[]</td><td>yellow</td></tr>
+									<tr><td>info</td><td>string | string[]</td><td>green</td></tr>
+									<tr><td>trace</td><td>string | string[]</td><td>cyan</td></tr>
+									<tr><td>debug</td><td>string | string[]</td><td>blue</td></tr>
+								</table>
+							</td>
+						</tr>
+						<tbody>
+				</table>
+				<h2 id="change">Change</h2>
+				<p>See <a href="CHANGE.md">CHANGE.md</a></p>
+				<h2 id="license">License</h2>
+				<p>See <a href="LICENSE.md">LICENSE.md</a></p>
+			</div>
+		</div>
+		<div class="col-4 col-menu menu-sticky-wrap menu-highlight">
+			<nav class="tsd-navigation primary">
+				<ul>
+					<li class="globals  ">
+						<a href="globals.html"><em>Globals</em></a>
+					</li>
+					<li class=" tsd-kind-external-module">
+						<a href="modules/_index_.html">"index"</a>
+					</li>
+					<li class=" tsd-kind-external-module">
+						<a href="modules/_interfaces_.html">"interfaces"</a>
+					</li>
+					<li class=" tsd-kind-external-module">
+						<a href="modules/_test_spec_.html">"test.spec"</a>
+					</li>
+					<li class=" tsd-kind-external-module">
+						<a href="modules/_timbr_.html">"timbr"</a>
+					</li>
+				</ul>
+			</nav>
+			<nav class="tsd-navigation secondary menu-sticky">
+				<ul class="before-current">
+				</ul>
+			</nav>
+		</div>
+	</div>
+</div>
+<footer class="with-border-bottom">
+	<div class="container">
+		<h2>Legend</h2>
+		<div class="tsd-legend-group">
+			<ul class="tsd-legend">
+				<li class="tsd-kind-module"><span class="tsd-kind-icon">Module</span></li>
+				<li class="tsd-kind-object-literal"><span class="tsd-kind-icon">Object literal</span></li>
+				<li class="tsd-kind-variable"><span class="tsd-kind-icon">Variable</span></li>
+				<li class="tsd-kind-function"><span class="tsd-kind-icon">Function</span></li>
+				<li class="tsd-kind-function tsd-has-type-parameter"><span class="tsd-kind-icon">Function with type parameter</span></li>
+				<li class="tsd-kind-index-signature"><span class="tsd-kind-icon">Index signature</span></li>
+				<li class="tsd-kind-type-alias"><span class="tsd-kind-icon">Type alias</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-enum"><span class="tsd-kind-icon">Enumeration</span></li>
+				<li class="tsd-kind-enum-member"><span class="tsd-kind-icon">Enumeration member</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-enum"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-enum"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-interface"><span class="tsd-kind-icon">Interface</span></li>
+				<li class="tsd-kind-interface tsd-has-type-parameter"><span class="tsd-kind-icon">Interface with type parameter</span></li>
+				<li class="tsd-kind-constructor tsd-parent-kind-interface"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-interface"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-interface"><span class="tsd-kind-icon">Method</span></li>
+				<li class="tsd-kind-index-signature tsd-parent-kind-interface"><span class="tsd-kind-icon">Index signature</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-class"><span class="tsd-kind-icon">Class</span></li>
+				<li class="tsd-kind-class tsd-has-type-parameter"><span class="tsd-kind-icon">Class with type parameter</span></li>
+				<li class="tsd-kind-constructor tsd-parent-kind-class"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class"><span class="tsd-kind-icon">Method</span></li>
+				<li class="tsd-kind-accessor tsd-parent-kind-class"><span class="tsd-kind-icon">Accessor</span></li>
+				<li class="tsd-kind-index-signature tsd-parent-kind-class"><span class="tsd-kind-icon">Index signature</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited method</span></li>
+				<li class="tsd-kind-accessor tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited accessor</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-protected"><span class="tsd-kind-icon">Protected property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-protected"><span class="tsd-kind-icon">Protected method</span></li>
+				<li class="tsd-kind-accessor tsd-parent-kind-class tsd-is-protected"><span class="tsd-kind-icon">Protected accessor</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-private"><span class="tsd-kind-icon">Private property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-private"><span class="tsd-kind-icon">Private method</span></li>
+				<li class="tsd-kind-accessor tsd-parent-kind-class tsd-is-private"><span class="tsd-kind-icon">Private accessor</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static property</span></li>
+				<li class="tsd-kind-call-signature tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static method</span></li>
+			</ul>
+		</div>
+	</div>
+</footer>
+<div class="container tsd-generator">
+	<p>Generated using <a href="http://typedoc.org/" target="_blank">TypeDoc</a></p>
+</div>
+<div class="overlay"></div>
+<script src="assets/js/main.js"></script>
+<script>if (location.protocol == 'file:') document.write('<script src="assets/js/search.js"><' + '/script>');</script>
+</body>
+</html>
