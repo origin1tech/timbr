@@ -52,4 +52,11 @@ describe('Timbr', () => {
     assert.deepEqual(result.error, err);
   });
 
+  it('should handle converting message to an error.', () => {
+    log.set('errorConstruct', true);
+    const result = log.logger('error:resolve', 'converted to error.') as ITimbrEventData;
+    log.set('errorConstruct', false);
+    assert.instanceOf(result.error, Error);
+  });
+
 });

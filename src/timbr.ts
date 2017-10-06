@@ -8,7 +8,7 @@ import { format, inspect } from 'util';
 import { EOL } from 'os';
 
 const STYLES: ITimbrStyles = {
-  error: ['bold', 'underline', 'red'],
+  error: ['bold', 'red'],
   warn: 'yellow',
   info: 'green',
   trace: 'cyan',
@@ -19,13 +19,15 @@ const DEFAULTS: ITimbrOptions = {
   stream: undefined,      // the stream to output log messages to.
   level: 'info',          // the level the logger is current set at.
   padLevels: true,        // when true levels are padded on the left.
+  labelLevels: true,      // when true level lable prefixes log message.
   colorize: true,         // whether or not to colorize output.
   errorExit: false,       // exit on error level.
   errorConvert: false,    // if first arg is error instance convert to error level.
   errorCapture: false,    // whether or not to capture uncaught errors.
   errorLevel: 'error',    // level to use for errors.
+  errorConstruct: false,  // when true if error level convert msg to instanceof Error.
   stackTrace: true,       // whether or not to display full stack trace for errors.
-  stackDepth: 3,          // the depth of stack traces results 0 for full stack.
+  stackDepth: 0,          // the depth of stack traces results 0 for full stack.
   prettyStack: false,     // whether or not to prettify the stack trace.
   miniStack: false,       // mini stack trace appended to message.
   timestamp: 'time',      // timestamp format date, time or false.
@@ -367,16 +369,22 @@ export class TimbrInstance extends EventEmitter {
     const debugGroup = type === 'debug' && splitType[1];
 
     let stackTrace: IStacktraceResult;
-    let err, errMsg, meta, tsFmt, ts, msg, normalized, rawMsg;
+    let err, errMsg, meta, tsFmt, ts, msg, normalized, rawMsg, errType;
     let fn: EventCallback = noop;
 
     const clone = args.slice(0);
     const result = [];
     const suffix = [];
+    let pruneTrace = 1;
 
     // Converts to error if first arg is instance of Error.
     if ((clone[0] instanceof Error) && this.options.errorConvert)
       type = this.options.errorLevel;
+
+    if (type === this.options.errorLevel && this.options.errorConstruct && isString(clone[0])) {
+      clone[0] = new Error(clone[0]);
+      pruneTrace = 2;
+    }
 
     const level = this.getIndex(type);
     const activeLevel = this.getIndex(this.options.level);
@@ -391,8 +399,7 @@ export class TimbrInstance extends EventEmitter {
 
     meta = isPlainObject(last(clone)) ? clone.pop() : null;
     err = isError(first(clone)) ? clone.shift() : null;
-
-    stackTrace = err ? this.parseStack(err.stack, 1) : this.parseStack((new Error('get stack')).stack, 3);
+    stackTrace = err ? this.parseStack(err.stack, pruneTrace) : this.parseStack((new Error('get stack')).stack, 3);
 
     tsFmt = `${this.getTimestamp()}`;
     ts = `${this.getTimestamp(true)}`;
@@ -400,6 +407,9 @@ export class TimbrInstance extends EventEmitter {
     // Add optional timestamp.
     if (this.options.timestamp)
       result.push(this.colorizeIf(`[${tsFmt}]`, 'magenta'));
+
+    // Add error type if not generic 'Error'.
+    errType = err && err.name !== 'Error' ? `:${err.name}` : '';
 
     // Add the type.
     let styles = this.options.styles;
@@ -410,12 +420,13 @@ export class TimbrInstance extends EventEmitter {
       styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
       styledType += styledDebugType;
     }
-    result.push(padding + styledType + ':');
+    styledType += this.colorizeIf(errType, styles[type]);
+    if (this.options.labelLevels)
+      result.push(padding + styledType + ':');
 
     // If error we need to build the message.
     if (err) {
-      errMsg = (err.name || 'Error') + ': ';
-      errMsg += (err.message || 'Uknown Error');
+      errMsg = (err.message || 'Uknown Error');
       clone.unshift(errMsg);
     }
 
@@ -534,8 +545,7 @@ export class TimbrInstance extends EventEmitter {
         toggleExceptionHandler = true;
     }
     else {
-      if (this.options[<string>key])
-        this.options[<string>key] = value;
+      this.options[<string>key] = value;
     }
     if (toggleExceptionHandler)
       this.toggleExceptionHandler(this.options.errorCapture);

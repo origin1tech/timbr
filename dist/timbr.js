@@ -17,7 +17,7 @@ var chek_1 = require("chek");
 var util_1 = require("util");
 var os_1 = require("os");
 var STYLES = {
-    error: ['bold', 'underline', 'red'],
+    error: ['bold', 'red'],
     warn: 'yellow',
     info: 'green',
     trace: 'cyan',
@@ -27,13 +27,15 @@ var DEFAULTS = {
     stream: undefined,
     level: 'info',
     padLevels: true,
+    labelLevels: true,
     colorize: true,
     errorExit: false,
     errorConvert: false,
     errorCapture: false,
     errorLevel: 'error',
+    errorConstruct: false,
     stackTrace: true,
-    stackDepth: 3,
+    stackDepth: 0,
     prettyStack: false,
     miniStack: false,
     timestamp: 'time',
@@ -321,14 +323,19 @@ var TimbrInstance = /** @class */ (function (_super) {
         var isException = splitType[1] && splitType[1] === 'exception';
         var debugGroup = type === 'debug' && splitType[1];
         var stackTrace;
-        var err, errMsg, meta, tsFmt, ts, msg, normalized, rawMsg;
+        var err, errMsg, meta, tsFmt, ts, msg, normalized, rawMsg, errType;
         var fn = chek_1.noop;
         var clone = args.slice(0);
         var result = [];
         var suffix = [];
+        var pruneTrace = 1;
         // Converts to error if first arg is instance of Error.
         if ((clone[0] instanceof Error) && this.options.errorConvert)
             type = this.options.errorLevel;
+        if (type === this.options.errorLevel && this.options.errorConstruct && chek_1.isString(clone[0])) {
+            clone[0] = new Error(clone[0]);
+            pruneTrace = 2;
+        }
         var level = this.getIndex(type);
         var activeLevel = this.getIndex(this.options.level);
         if (level > activeLevel)
@@ -339,12 +346,14 @@ var TimbrInstance = /** @class */ (function (_super) {
         }
         meta = chek_1.isPlainObject(chek_1.last(clone)) ? clone.pop() : null;
         err = chek_1.isError(chek_1.first(clone)) ? clone.shift() : null;
-        stackTrace = err ? this.parseStack(err.stack, 1) : this.parseStack((new Error('get stack')).stack, 3);
+        stackTrace = err ? this.parseStack(err.stack, pruneTrace) : this.parseStack((new Error('get stack')).stack, 3);
         tsFmt = "" + this.getTimestamp();
         ts = "" + this.getTimestamp(true);
         // Add optional timestamp.
         if (this.options.timestamp)
             result.push(this.colorizeIf("[" + tsFmt + "]", 'magenta'));
+        // Add error type if not generic 'Error'.
+        errType = err && err.name !== 'Error' ? ":" + err.name : '';
         // Add the type.
         var styles = this.options.styles;
         var styledType = this.colorizeIf(type, styles[type]);
@@ -354,11 +363,12 @@ var TimbrInstance = /** @class */ (function (_super) {
             styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
             styledType += styledDebugType;
         }
-        result.push(padding + styledType + ':');
+        styledType += this.colorizeIf(errType, styles[type]);
+        if (this.options.labelLevels)
+            result.push(padding + styledType + ':');
         // If error we need to build the message.
         if (err) {
-            errMsg = (err.name || 'Error') + ': ';
-            errMsg += (err.message || 'Uknown Error');
+            errMsg = (err.message || 'Uknown Error');
             clone.unshift(errMsg);
         }
         rawMsg = clone[0] || null;
@@ -459,8 +469,7 @@ var TimbrInstance = /** @class */ (function (_super) {
                 toggleExceptionHandler = true;
         }
         else {
-            if (this.options[key])
-                this.options[key] = value;
+            this.options[key] = value;
         }
         if (toggleExceptionHandler)
             this.toggleExceptionHandler(this.options.errorCapture);

@@ -49,11 +49,13 @@ export interface ITimbrOptions {
     timestamp?: boolean | 'time' | 'datetime';
     level?: string | number;
     padLevels?: boolean;
+    labelLevels?: boolean;
     colorize?: boolean;
     errorCapture?: boolean;
     errorExit?: boolean;
     errorConvert?: boolean;
     errorLevel?: string;
+    errorConstruct?: boolean;
     stackTrace?: boolean;
     stackDepth?: number;
     prettyStack?: boolean;
