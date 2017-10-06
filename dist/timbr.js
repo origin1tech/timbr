@@ -45,7 +45,7 @@ var DEFAULTS = {
     styles: STYLES,
     enabled: true,
 };
-var TimbrInstance = (function (_super) {
+var TimbrInstance = /** @class */ (function (_super) {
     __extends(TimbrInstance, _super);
     function TimbrInstance(options) {
         var levels = [];
@@ -554,7 +554,7 @@ var TimbrInstance = (function (_super) {
     return TimbrInstance;
 }(events_1.EventEmitter));
 exports.TimbrInstance = TimbrInstance;
-var Timbr = (function (_super) {
+var Timbr = /** @class */ (function (_super) {
     __extends(Timbr, _super);
     function Timbr(options) {
         return _super.call(this, options, 'error', 'warn', 'info', 'trace', 'debug') || this;

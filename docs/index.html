@@ -154,18 +154,18 @@ serverDebug.disable() <span class="hljs-comment">// disables the debugger.</span
 				<ul>
 					<li><strong>timestamp</strong> - the timestamp.</li>
 					<li><strong>type</strong> - the type of message that was logged.</li>
-					<li><strong>message</strong> - the log message</li>
+					<li><strong>message</strong> - the formatted log message</li>
 					<li><strong>meta</strong> - any metadata objects.</li>
 					<li><strong>args</strong> - the source arguments.</li>
 					<li><strong>error</strong> - instance of Error if present.</li>
 					<li><strong>stackTrace</strong> - the stack trace.</li>
 				</ul>
-				<pre><code class="lang-ts">log.on(<span class="hljs-string">'logged'</span>, <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">type</span>, msg, meta, data</span>) =&gt;</span> {
+				<pre><code class="lang-ts">log.on(<span class="hljs-string">'log'</span>, <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">type</span>, msg, meta, data</span>) =&gt;</span> {
   <span class="hljs-comment">// do something</span>
 })
 </code></pre>
 				<p>You can also listen for specific log events. Error, warn, info and debug are supported.</p>
-				<pre><code class="lang-ts">log.on(<span class="hljs-string">'logged:info'</span>, <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">type</span>, msg, meta, data</span>) =&gt;</span> {
+				<pre><code class="lang-ts">log.on(<span class="hljs-string">'log:info'</span>, <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">type</span>, msg, meta, data</span>) =&gt;</span> {
   <span class="hljs-comment">// do something</span>
 })
 </code></pre>
@@ -177,18 +177,21 @@ serverDebug.disable() <span class="hljs-comment">// disables the debugger.</span
 					<tbody>
 						<tr><td>stream</td><td>stream to output to.</td><td>WriteableStream</td><td>process.stdout</td></tr>
 						<tr><td>level</td><td>active log level.</td><td>string | number</td><td>info</td></tr>
+						<tr><td>padLevels</td><td>pads left of level.</td><td>boolean</td><td>true</td></tr>
+						<tr><td>labelLevels</td><td>when true log messages prefixed with level label.</td><td>boolean</td><td>true</td></tr>
 						<tr><td>colorize</td><td>enables/disables colors.</td><td>boolean</td><td>true</td></tr>
 						<tr><td>errorExit</td><td>when true exits on errors.</td><td>boolean</td><td>false</td></tr>
 						<tr><td>errorCapture</td><td>capture uncaught exceptions.</td><td>boolean</td><td>false</td></tr>
 						<tr><td>errorConvert</td><td>if first arg Error instance convet to error log level.</td><td>boolean</td><td>false</td></tr>
 						<tr><td>errorLevel</td><td>the error level name.</td><td>string</td><td>error</td></tr>
 						<tr><td>stackTrace</td><td>when true full stack trace shown on errors.</td><td>boolean</td><td>true</td></tr>
-						<tr><td>stackDepth</td><td>depth of stack trace to display.</td><td>number</td><td>2</td></tr>
+						<tr><td>stackDepth</td><td>depth of stack trace to display.</td><td>number</td><td>0</td></tr>
 						<tr><td>prettyStack</td><td>when true stack trace is formated output as object.</td><td>boolean</td><td>false</td></tr>
 						<tr><td>miniStack</td><td>when true file, line &amp; column shown on all messages.</td><td>boolean</td><td>true</td></tr>
 						<tr><td>timestamp</td><td>enables/disables or defines timestamp type.</td><td>boolean | time | datetime</td><td>time</td></tr>
 						<tr><td>debugLevel</td><td>the log level used for debugging</td><td>string</td><td>debug</td></tr>
 						<tr><td>debuggers</td><td>array of active debuggers</td><td>string | string[]</td><td>[]</td></tr>
+						<tr><td>debugAuto</td><td>when true if node debug set level as same</td><td>boolean</td><td>true</td></tr>
 						<tr><td>enabled</td><td>initialize as enabled or disabled.</td><td>boolean</td><td>true</td></tr>
 						<tr>
 							<td>colors</td>
