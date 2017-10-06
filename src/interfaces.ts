@@ -16,6 +16,7 @@ export interface ITimbrEventData {
   timestamp: string;
   type: string;
   message: string;
+  formatted: string;
   meta: IMap<any>;
   args: any[];
   error?: Error;

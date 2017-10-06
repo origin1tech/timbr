@@ -26,8 +26,8 @@ var STYLES = {
 var DEFAULTS = {
     stream: undefined,
     level: 'info',
-    padLevels: true,
     labelLevels: true,
+    padLevels: true,
     colorize: true,
     errorExit: false,
     errorConvert: false,
@@ -45,7 +45,7 @@ var DEFAULTS = {
     styles: STYLES,
     enabled: true,
 };
-var TimbrInstance = /** @class */ (function (_super) {
+var TimbrInstance = (function (_super) {
     __extends(TimbrInstance, _super);
     function TimbrInstance(options) {
         var levels = [];
@@ -314,18 +314,20 @@ var TimbrInstance = /** @class */ (function (_super) {
         }
         if (!this.options.enabled)
             return this;
+        var clone = args.slice(0);
         var origType = type;
         var splitType = type.split(':');
         type = splitType[0];
         // Flags used internally.
         var isResolve = chek_1.contains(splitType, 'resolve');
-        var isResolveEmit = isResolve && chek_1.contains(splitType, 'emit');
-        var isException = splitType[1] && splitType[1] === 'exception';
+        var isException = chek_1.contains(splitType, 'exception');
         var debugGroup = type === 'debug' && splitType[1];
+        var knownType = chek_1.contains(this._levels, type);
+        var emitType = !debugGroup ? splitType[0] : origType;
         var stackTrace;
-        var err, errMsg, meta, tsFmt, ts, msg, normalized, rawMsg, errType;
+        var err, errMsg, meta, metaFormatted, tsFmt, ts, msg, normalized, rawMsg, errType;
+        var event;
         var fn = chek_1.noop;
-        var clone = args.slice(0);
         var result = [];
         var suffix = [];
         var pruneTrace = 1;
@@ -338,7 +340,8 @@ var TimbrInstance = /** @class */ (function (_super) {
         }
         var level = this.getIndex(type);
         var activeLevel = this.getIndex(this.options.level);
-        if (level > activeLevel)
+        // If resolve ignore level checking.
+        if (level > activeLevel && !isResolve)
             return this;
         if (chek_1.isFunction(chek_1.last(clone))) {
             fn = clone.pop();
@@ -346,26 +349,30 @@ var TimbrInstance = /** @class */ (function (_super) {
         }
         meta = chek_1.isPlainObject(chek_1.last(clone)) ? clone.pop() : null;
         err = chek_1.isError(chek_1.first(clone)) ? clone.shift() : null;
-        stackTrace = err ? this.parseStack(err.stack, pruneTrace) : this.parseStack((new Error('get stack')).stack, 3);
-        tsFmt = "" + this.getTimestamp();
-        ts = "" + this.getTimestamp(true);
+        stackTrace = err ?
+            this.parseStack(err.stack, pruneTrace) :
+            this.parseStack((new Error('get stack')).stack, 3);
         // Add optional timestamp.
-        if (this.options.timestamp)
+        if (this.options.timestamp) {
+            tsFmt = "" + this.getTimestamp();
+            ts = "" + this.getTimestamp(true);
             result.push(this.colorizeIf("[" + tsFmt + "]", 'magenta'));
+        }
         // Add error type if not generic 'Error'.
         errType = err && err.name !== 'Error' ? ":" + err.name : '';
-        // Add the type.
-        var styles = this.options.styles;
-        var styledType = this.colorizeIf(type, styles[type]);
-        var padding = this.pad(origType);
-        var styledDebugType;
-        if (debugGroup) {
-            styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
-            styledType += styledDebugType;
-        }
-        styledType += this.colorizeIf(errType, styles[type]);
-        if (this.options.labelLevels)
+        // Add log label type.
+        if (!knownType || !this.options.labelLevels) {
+            var styles = this.options.styles;
+            var styledType = this.colorizeIf(type, styles[type]);
+            var padding = this.pad(emitType);
+            var styledDebugType = void 0;
+            if (debugGroup) {
+                styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
+                styledType += styledDebugType;
+            }
+            styledType += this.colorizeIf(errType, styles[type]);
             result.push(padding + styledType + ':');
+        }
         // If error we need to build the message.
         if (err) {
             errMsg = (err.message || 'Uknown Error');
@@ -390,7 +397,8 @@ var TimbrInstance = /** @class */ (function (_super) {
         }
         // Add formatted metadata to result.
         if (meta) {
-            result.push(util_1.format(util_1.inspect(meta, null, null, this.options.colorize)));
+            metaFormatted = util_1.format(util_1.inspect(meta, null, null, this.options.colorize));
+            result.push(metaFormatted);
         }
         // Add ministack.
         if (this.options.miniStack && stackTrace)
@@ -407,29 +415,27 @@ var TimbrInstance = /** @class */ (function (_super) {
         // Output to stream.
         if (!isResolve)
             this.stream.write(msg);
-        var event = {
+        event = {
             timestamp: ts,
             type: type,
-            message: rawMsg,
+            message: rawMsg + (metaFormatted || ''),
+            formatted: msg,
             meta: meta,
             args: args,
             error: err,
             stackTrace: stackTrace.frames,
         };
         // Emit logged and logged by type listeners.
-        if (!isResolve || isResolveEmit) {
-            this.emit('logged', event);
-            this.emit("logged:" + origType, event);
-        }
+        this.emit('log', event);
+        this.emit("log:" + emitType, event);
         // Call local callback.
         fn(event);
         // Toggle the exception for.
         if (isException)
             this.toggleExceptionHandler(false);
         // If no ouput return object.
-        if (isResolve) {
+        if (isResolve)
             return event;
-        }
         // Check if should exit on error.
         if (type === this.options.errorLevel && this.options.errorExit)
             process.exit();
@@ -532,13 +538,8 @@ var TimbrInstance = /** @class */ (function (_super) {
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        args[0] = args[0] || '';
-        var msg;
-        if (/(%s|%d|%j|%%)/g.test(args[0]))
-            msg = util_1.format(args[0], args.slice(1));
-        else
-            msg = args.join(' ');
-        this.stream.write(msg + os_1.EOL);
+        var obj = this.logger.apply(this, ['write:resolve'].concat(args));
+        this.stream.write(obj.message + os_1.EOL);
         return this;
     };
     /**
@@ -553,7 +554,7 @@ var TimbrInstance = /** @class */ (function (_super) {
     return TimbrInstance;
 }(events_1.EventEmitter));
 exports.TimbrInstance = TimbrInstance;
-var Timbr = /** @class */ (function (_super) {
+var Timbr = (function (_super) {
     __extends(Timbr, _super);
     function Timbr(options) {
         return _super.call(this, options, 'error', 'warn', 'info', 'trace', 'debug') || this;

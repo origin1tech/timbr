@@ -1,5 +1,13 @@
 # Change Log
 
+### 10.5.2017 (1.1.0)
+
+<table>
+  <tr><td>write</td><td>better handling for write method, formatted message includes metatdata if present.</td></tr>
+  <tr><td>logger</td><td>simplified internal flags for logger method.</td></tr>
+  <tr><td>events</td><td>emitted events use 'log:type' instead of 'logged:type' where type is info, warn, error etc.</td></tr>
+</table>
+
 ### 10.5.2017 (1.0.2)
 
 <table>

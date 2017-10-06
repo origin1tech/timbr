@@ -25,11 +25,13 @@ describe('Timbr', () => {
   });
 
   it('should emit result on logged message', (done) => {
-    log.on('logged:info:resolve:emit', (result) => {
+    const handler = (result) => {
+      log.removeListener('log:info', handler);
       assert.equal(result.message, 'there was violence on "many sides".');
       done();
-    });
-    log.logger('info:resolve:emit', 'there was violence on "many sides".');
+    };
+    log.on('log:info', handler);
+    log.logger('info:resolve', 'there was violence on "many sides".');
   });
 
   it('should log with metadata.', () => {

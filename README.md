@@ -144,14 +144,14 @@ The Event Emitter callback returns the following arguments.
 
 + **timestamp** - the timestamp.
 + **type** - the type of message that was logged.
-+ **message** - the log message
++ **message** - the formatted log message
 + **meta** - any metadata objects.
 + **args** - the source arguments.
 + **error** - instance of Error if present.
 + **stackTrace** - the stack trace.
 
 ```ts
-log.on('logged', (type, msg, meta, data) => {
+log.on('log', (type, msg, meta, data) => {
   // do something
 })
 ```
@@ -159,7 +159,7 @@ log.on('logged', (type, msg, meta, data) => {
 You can also listen for specific log events. Error, warn, info and debug are supported.
 
 ```ts
-log.on('logged:info', (type, msg, meta, data) => {
+log.on('log:info', (type, msg, meta, data) => {
   // do something
 })
 ```
@@ -173,18 +173,21 @@ log.on('logged:info', (type, msg, meta, data) => {
   <tbody>
     <tr><td>stream</td><td>stream to output to.</td><td>WriteableStream</td><td>process.stdout</td></tr>
     <tr><td>level</td><td>active log level.</td><td>string | number</td><td>info</td></tr>
+    <tr><td>padLevels</td><td>pads left of level.</td><td>boolean</td><td>true</td></tr>
+    <tr><td>labelLevels</td><td>when true log messages prefixed with level label.</td><td>boolean</td><td>true</td></tr>
     <tr><td>colorize</td><td>enables/disables colors.</td><td>boolean</td><td>true</td></tr>
     <tr><td>errorExit</td><td>when true exits on errors.</td><td>boolean</td><td>false</td></tr>
     <tr><td>errorCapture</td><td>capture uncaught exceptions.</td><td>boolean</td><td>false</td></tr>
     <tr><td>errorConvert</td><td>if first arg Error instance convet to error log level.</td><td>boolean</td><td>false</td></tr>
     <tr><td>errorLevel</td><td>the error level name.</td><td>string</td><td>error</td></tr>
     <tr><td>stackTrace</td><td>when true full stack trace shown on errors.</td><td>boolean</td><td>true</td></tr>
-    <tr><td>stackDepth</td><td>depth of stack trace to display.</td><td>number</td><td>2</td></tr>
+    <tr><td>stackDepth</td><td>depth of stack trace to display.</td><td>number</td><td>0</td></tr>
     <tr><td>prettyStack</td><td>when true stack trace is formated output as object.</td><td>boolean</td><td>false</td></tr>
     <tr><td>miniStack</td><td>when true file, line & column shown on all messages.</td><td>boolean</td><td>true</td></tr>
     <tr><td>timestamp</td><td>enables/disables or defines timestamp type.</td><td>boolean | time | datetime</td><td>time</td></tr>
     <tr><td>debugLevel</td><td>the log level used for debugging</td><td>string</td><td>debug</td></tr>
     <tr><td>debuggers</td><td>array of active debuggers</td><td>string | string[]</td><td>[]</td></tr>
+    <tr><td>debugAuto</td><td>when true if node debug set level as same</td><td>boolean</td><td>true</td></tr>
     <tr><td>enabled</td><td>initialize as enabled or disabled.</td><td>boolean</td><td>true</td></tr>
     <tr>
       <td>colors</td>

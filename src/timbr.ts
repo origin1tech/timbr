@@ -18,8 +18,8 @@ const STYLES: ITimbrStyles = {
 const DEFAULTS: ITimbrOptions = {
   stream: undefined,      // the stream to output log messages to.
   level: 'info',          // the level the logger is current set at.
+  labelLevels: true,      // when true level label prefixes log message.
   padLevels: true,        // when true levels are padded on the left.
-  labelLevels: true,      // when true level lable prefixes log message.
   colorize: true,         // whether or not to colorize output.
   errorExit: false,       // exit on error level.
   errorConvert: false,    // if first arg is error instance convert to error level.
@@ -358,21 +358,23 @@ export class TimbrInstance extends EventEmitter {
     if (!this.options.enabled)
       return this;
 
+    const clone = args.slice(0);
     const origType = type;
     const splitType = type.split(':');
     type = splitType[0];
 
     // Flags used internally.
     const isResolve = contains(splitType, 'resolve');
-    const isResolveEmit = isResolve && contains(splitType, 'emit');
-    const isException = splitType[1] && splitType[1] === 'exception';
+    const isException = contains(splitType, 'exception');
     const debugGroup = type === 'debug' && splitType[1];
+    const knownType = contains(this._levels, type);
+    const emitType = !debugGroup ? splitType[0] : origType;
 
     let stackTrace: IStacktraceResult;
-    let err, errMsg, meta, tsFmt, ts, msg, normalized, rawMsg, errType;
+    let err, errMsg, meta, metaFormatted, tsFmt, ts, msg, normalized, rawMsg, errType;
+    let event: ITimbrEventData;
     let fn: EventCallback = noop;
 
-    const clone = args.slice(0);
     const result = [];
     const suffix = [];
     let pruneTrace = 1;
@@ -389,7 +391,8 @@ export class TimbrInstance extends EventEmitter {
     const level = this.getIndex(type);
     const activeLevel = this.getIndex(this.options.level);
 
-    if (level > activeLevel)
+    // If resolve ignore level checking.
+    if (level > activeLevel && !isResolve)
       return this;
 
     if (isFunction(last(clone))) {
@@ -399,30 +402,33 @@ export class TimbrInstance extends EventEmitter {
 
     meta = isPlainObject(last(clone)) ? clone.pop() : null;
     err = isError(first(clone)) ? clone.shift() : null;
-    stackTrace = err ? this.parseStack(err.stack, pruneTrace) : this.parseStack((new Error('get stack')).stack, 3);
-
-    tsFmt = `${this.getTimestamp()}`;
-    ts = `${this.getTimestamp(true)}`;
+    stackTrace = err ?
+      this.parseStack(err.stack, pruneTrace) :
+      this.parseStack((new Error('get stack')).stack, 3);
 
     // Add optional timestamp.
-    if (this.options.timestamp)
+    if (this.options.timestamp) {
+      tsFmt = `${this.getTimestamp()}`;
+      ts = `${this.getTimestamp(true)}`;
       result.push(this.colorizeIf(`[${tsFmt}]`, 'magenta'));
+    }
 
     // Add error type if not generic 'Error'.
     errType = err && err.name !== 'Error' ? `:${err.name}` : '';
 
-    // Add the type.
-    let styles = this.options.styles;
-    let styledType = this.colorizeIf(type, styles[type]);
-    const padding = this.pad(origType);
-    let styledDebugType;
-    if (debugGroup) {
-      styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
-      styledType += styledDebugType;
-    }
-    styledType += this.colorizeIf(errType, styles[type]);
-    if (this.options.labelLevels)
+    // Add log label type.
+    if (!knownType || !this.options.labelLevels) {
+      let styles = this.options.styles;
+      let styledType = this.colorizeIf(type, styles[type]);
+      const padding = this.pad(emitType);
+      let styledDebugType;
+      if (debugGroup) {
+        styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
+        styledType += styledDebugType;
+      }
+      styledType += this.colorizeIf(errType, styles[type]);
       result.push(padding + styledType + ':');
+    }
 
     // If error we need to build the message.
     if (err) {
@@ -451,7 +457,8 @@ export class TimbrInstance extends EventEmitter {
 
     // Add formatted metadata to result.
     if (meta) {
-      result.push(format(inspect(meta, null, null, this.options.colorize)));
+      metaFormatted = format(inspect(meta, null, null, this.options.colorize));
+      result.push(metaFormatted);
     }
 
     // Add ministack.
@@ -473,10 +480,11 @@ export class TimbrInstance extends EventEmitter {
     if (!isResolve)
       this.stream.write(msg);
 
-    const event: ITimbrEventData = {
+    event = {
       timestamp: ts,
       type: type,
-      message: rawMsg,
+      message: rawMsg + (metaFormatted || ''),
+      formatted: msg,
       meta: meta,
       args: args,
       error: err,
@@ -484,10 +492,8 @@ export class TimbrInstance extends EventEmitter {
     };
 
     // Emit logged and logged by type listeners.
-    if (!isResolve || isResolveEmit) {
-      this.emit('logged', event);
-      this.emit(`logged:${origType}`, event);
-    }
+    this.emit('log', event);
+    this.emit(`log:${emitType}`, event);
 
     // Call local callback.
     fn(event);
@@ -497,9 +503,8 @@ export class TimbrInstance extends EventEmitter {
       this.toggleExceptionHandler(false);
 
     // If no ouput return object.
-    if (isResolve) {
+    if (isResolve)
       return event;
-    }
 
     // Check if should exit on error.
     if (type === this.options.errorLevel && this.options.errorExit)
@@ -602,13 +607,8 @@ export class TimbrInstance extends EventEmitter {
    * @param args arguments to output to stream directly.
    */
   write(...args: any[]) {
-    args[0] = args[0] || '';
-    let msg;
-    if (/(%s|%d|%j|%%)/g.test(args[0]))
-      msg = format(args[0], args.slice(1));
-    else
-      msg = args.join(' ');
-    this.stream.write(msg + EOL);
+    const obj = this.logger('write:resolve', ...args) as ITimbrEventData;
+    this.stream.write(obj.message + EOL);
     return this;
   }
 
