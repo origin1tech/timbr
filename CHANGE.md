@@ -1,5 +1,11 @@
 # Change Log
 
+### 10.7.2017 (1.0.3)
+
+<table>
+  <tr><td>.npmignore</td><td>ignore unnecessary folders.</td></tr>
+</table>
+
 ### 10.5.2017 (1.1.0)
 
 <table>
