@@ -16,6 +16,11 @@ export declare class TimbrInstance extends EventEmitter {
      */
     private normalizeLevels();
     /**
+     * Is Debug
+     * Returns true if level matches debug level.
+     */
+    private isDebugging();
+    /**
      * Get Index
      * Gets the index of a value in an array.
      *

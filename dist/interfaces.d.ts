@@ -64,6 +64,7 @@ export interface ITimbrOptions {
     debugLevel?: string;
     debuggers?: string | string[];
     debugAuto?: boolean;
+    debugOnly?: boolean;
     styles?: ITimbrStyles;
     enabled?: boolean;
 }

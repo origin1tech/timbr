@@ -42,6 +42,7 @@ var DEFAULTS = {
     debugLevel: 'debug',
     debuggers: [],
     debugAuto: true,
+    debugOnly: false,
     styles: STYLES,
     enabled: true,
 };
@@ -58,17 +59,20 @@ var TimbrInstance = /** @class */ (function (_super) {
         // Normalizes when custom.
         _this._levels = levels;
         _this.normalizeLevels();
-        if (chek_1.isDebug() && _this.options.debugAuto) {
-            var debugLevel = _this.options.debugLevel;
-            if (~levels.indexOf(debugLevel))
-                _this.options.level = debugLevel;
-        }
         if (_this.options.errorCapture)
             _this.toggleExceptionHandler(true);
         _this.stream = _this.options.stream || process.stdout;
         _this._colurs = new colurs_1.Colurs({ enabled: _this.options.colorize });
+        // initialized with debuggers set them.
         if (_this.options.debuggers.length)
             _this._debuggers = chek_1.isString(_this.options.debuggers) ? [_this.options.debuggers] : _this.options.debuggers;
+        if ((chek_1.isDebug() || process.env.DEBUG) && _this.options.debugAuto) {
+            var debugLevel = _this.options.debugLevel;
+            if (~levels.indexOf(debugLevel))
+                _this.options.level = debugLevel;
+            if (process.env.DEBUG)
+                _this.addDebugger(process.env.DEBUG);
+        }
         // Init methods.
         levels.forEach(function (l, i) {
             _this[l] = _this.logger.bind(_this, l);
@@ -114,6 +118,13 @@ var TimbrInstance = /** @class */ (function (_super) {
             if (!_this.options.styles[l])
                 _this.options.styles[l] = baseStyles[i] || (Math.floor(Math.random() * 6) + 1);
         });
+    };
+    /**
+     * Is Debug
+     * Returns true if level matches debug level.
+     */
+    TimbrInstance.prototype.isDebugging = function () {
+        return this.options.level === this.options.debugLevel;
     };
     /**
      * Get Index
@@ -340,7 +351,12 @@ var TimbrInstance = /** @class */ (function (_super) {
         }
         var level = this.getIndex(type);
         var activeLevel = this.getIndex(this.options.level);
-        // If resolve ignore level checking.
+        // If debugOnly and we are debugging ensure is debug level.
+        if (this.options.debugOnly &&
+            this.isDebugging() &&
+            type !== this.options.level)
+            return this;
+        // Check if is loggable level.
         if (level > activeLevel && !isResolve)
             return this;
         if (chek_1.isFunction(chek_1.last(clone))) {
@@ -361,15 +377,15 @@ var TimbrInstance = /** @class */ (function (_super) {
         // Add error type if not generic 'Error'.
         errType = err && err.name !== 'Error' ? ":" + err.name : '';
         // Add log label type.
-        if (!knownType || !this.options.labelLevels) {
+        if (knownType && this.options.labelLevels) {
             var styles = this.options.styles;
             var styledType = this.colorizeIf(type, styles[type]);
-            var padding = this.pad(emitType);
             var styledDebugType = void 0;
             if (debugGroup) {
                 styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
                 styledType += styledDebugType;
             }
+            var padding = this.pad(type);
             styledType += this.colorizeIf(errType, styles[type]);
             result.push(padding + styledType + ':');
         }

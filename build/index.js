@@ -51,11 +51,16 @@ const actions = {
     return actions;
   },
 
-  compile: () => {
+  compile: (watch) => {
     opts = '-p ./src/tsconfig.json'
+    opts += (watch ? ' -w' : '');
     cmd = normalize('./node_modules/typescript/bin/tsc', opts);
     exec.node(cmd);
-    // log.info(`successfully compiled ${pkg.name}.`);
+    return actions;
+  },
+
+  watch: () => {
+    actions.compile(true);
     return actions;
   },
 

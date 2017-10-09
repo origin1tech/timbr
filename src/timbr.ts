@@ -34,6 +34,7 @@ const DEFAULTS: ITimbrOptions = {
   debugLevel: 'debug',    // level to use for debug.
   debuggers: [],          // active debug groups.
   debugAuto: true,        // when true switch to debug level on Node debug detected.
+  debugOnly: false,       // when debugging only show debug level messages.
   styles: STYLES,         // ansi styles for coloring log messages.
   enabled: true,          // used in testing.
 };
@@ -57,27 +58,29 @@ export class TimbrInstance extends EventEmitter {
     this._levels = levels;
     this.normalizeLevels();
 
-    if (isDebug() && this.options.debugAuto) {
-      const debugLevel = this.options.debugLevel;
-      if (~levels.indexOf(<string>debugLevel))
-        this.options.level = <string>debugLevel;
-    }
-
     if (this.options.errorCapture)
       this.toggleExceptionHandler(true);
 
     this.stream = this.options.stream || process.stdout;
     this._colurs = new Colurs({ enabled: this.options.colorize });
 
+    // initialized with debuggers set them.
     if (this.options.debuggers.length)
       this._debuggers = isString(this.options.debuggers) ? [<string>this.options.debuggers] : this.options.debuggers as string[];
+
+    if ((isDebug() || process.env.DEBUG) && this.options.debugAuto) {
+      const debugLevel = this.options.debugLevel;
+      if (~levels.indexOf(<string>debugLevel))
+        this.options.level = <string>debugLevel;
+      if (process.env.DEBUG)
+        this.addDebugger(process.env.DEBUG);
+    }
 
     // Init methods.
     levels.forEach((l, i) => {
       this[l] = this.logger.bind(this, l);
       return this;
     });
-
 
   }
 
@@ -127,6 +130,14 @@ export class TimbrInstance extends EventEmitter {
         this.options.styles[l] = baseStyles[i] || (Math.floor(Math.random() * 6) + 1);
     });
 
+  }
+
+  /**
+   * Is Debug
+   * Returns true if level matches debug level.
+   */
+  private isDebugging() {
+    return this.options.level === this.options.debugLevel;
   }
 
   /**
@@ -391,7 +402,13 @@ export class TimbrInstance extends EventEmitter {
     const level = this.getIndex(type);
     const activeLevel = this.getIndex(this.options.level);
 
-    // If resolve ignore level checking.
+    // If debugOnly and we are debugging ensure is debug level.
+    if (this.options.debugOnly &&
+      this.isDebugging() &&
+      type !== this.options.level)
+      return this;
+
+    // Check if is loggable level.
     if (level > activeLevel && !isResolve)
       return this;
 
@@ -417,15 +434,15 @@ export class TimbrInstance extends EventEmitter {
     errType = err && err.name !== 'Error' ? `:${err.name}` : '';
 
     // Add log label type.
-    if (!knownType || !this.options.labelLevels) {
+    if (knownType && this.options.labelLevels) {
       let styles = this.options.styles;
       let styledType = this.colorizeIf(type, styles[type]);
-      const padding = this.pad(emitType);
       let styledDebugType;
       if (debugGroup) {
         styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
         styledType += styledDebugType;
       }
+      const padding = this.pad(type);
       styledType += this.colorizeIf(errType, styles[type]);
       result.push(padding + styledType + ':');
     }
