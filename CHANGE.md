@@ -2,10 +2,11 @@
 
 List of changes by date/version.
 
-### 10.8.2017 (1.1.2)
+### 10.8.2017 (1.1.2-3)
 
 <table>
   <tr><td>logger()</td><td>fix bug where level labels not output (whoops).</td></tr>
+  <tr><td>deubugger.disable()</td><td>fix bug where context is lost.</td></tr>
 </table>
 
 ### 10.7.2017 (1.1.1)

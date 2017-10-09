@@ -603,8 +603,8 @@ export class TimbrInstance extends EventEmitter {
         return this;
       },
       exit: this.exit,
-      enable: this.addDebugger.bind(group),
-      disable: this.removeDebugger.bind(group)
+      enable: this.addDebugger.bind(this, group),
+      disable: this.removeDebugger.bind(this, group)
     };
 
   }
