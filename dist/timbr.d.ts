@@ -1,10 +1,11 @@
 /// <reference types="node" />
 import { EventEmitter } from 'events';
-import { WritableStream, ITimbrEventData, ITimbrOptions, ExtendWithMethods, OptionKeys } from './interfaces';
+import { WritableStream, ITimbrEventData, ITimbrOptions, ExtendWithMethods, OptionKeys, AnsiStyles } from './interfaces';
 export declare class TimbrInstance extends EventEmitter {
     private _debuggers;
     private _colurs;
     private _levels;
+    private _symbols;
     stream: WritableStream;
     options: ITimbrOptions;
     constructor(options?: ITimbrOptions, ...levels: string[]);
@@ -98,7 +99,7 @@ export declare class TimbrInstance extends EventEmitter {
     private pad(type, offset?);
     /**
      * Logger
-     * Private common logger method.
+     * : Common logger method.
      *
      * @param type the type of log message to log.
      * @param args the arguments to be logged.
@@ -146,12 +147,26 @@ export declare class TimbrInstance extends EventEmitter {
      */
     debuggers(): string[];
     /**
+     * Symbol
+     * : Gets known symbol for terminal or returns empty string.
+     *
+     * @param name the name of the symbol to return.
+     */
+    symbol(name: string, styles: AnsiStyles | AnsiStyles[]): string | any[];
+    /**
      * Write
      * : Directly outputs to stream after formatting.
      *
      * @param args arguments to output to stream directly.
      */
-    write(...args: any[]): this;
+    write(...args: any[]): void;
+    /**
+     * Concat
+     * : Same as write but concats to stream without line return appended.
+     *
+     * @param args the arguments to format and output.
+     */
+    concat(...args: any[]): this;
     /**
      * Exit
      * : Causes immediate exit.

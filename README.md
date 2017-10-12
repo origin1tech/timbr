@@ -90,13 +90,23 @@ log.info('just some important message.').exit();
 
 #### Log & Wrap
 
-Writes "----" before and after log message.
+Writes "----" before and after log message using the .write() method.
 
 ```ts
 log
   .write('----')
   .info('just some important message.')
   .write('----');
+```
+
+#### Log Concat
+
+Continually outputs to stream without line return.
+
+Results in 'one, two'.
+
+```ts
+log.concat('one, ').concat('two');
 ```
 
 #### Debuggers
@@ -116,6 +126,21 @@ const enabledDebug = log.debugger('posts', true) // creates and ensures enabled.
 
 const disabledDebug = log.debugger('puts', false) // creates and ensures disabled.
 
+```
+
+#### Log Symbols
+
+Logs message with '✔' success character.
+
+Supported symbols are 'info', 'success', 'warning', 'alert'. You may also pass
+any other supported unicode character if you wish for convenience.
+
+```ts
+log.write('successfully copied files.', log.symbol('success'));
+
+// With Color
+
+log.write('successfully copied files.', log.symbol('success', 'green'));
 ```
 
 ## Advanced Usage

@@ -2,10 +2,12 @@
 import { EventEmitter } from 'events';
 import { relative, parse } from 'path';
 import { Colurs, IColurs } from 'colurs';
-import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone } from 'chek';
-import { IStacktraceFrame, IStacktraceResult, WritableStream, ITimbrEventData, ITimbrOptions, ITimbrStyles, EventCallback, IMap, ExtendWithMethods, OptionKeys, RecordMethods } from './interfaces';
+import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone, isWindows } from 'chek';
+import { IStacktraceFrame, IStacktraceResult, WritableStream, ITimbrEventData, ITimbrOptions, ITimbrStyles, EventCallback, IMap, ExtendWithMethods, OptionKeys, RecordMethods, ITimbrSymbols, AnsiStyles } from './interfaces';
 import { format, inspect } from 'util';
 import { EOL } from 'os';
+
+const SYMBOLS_SUPPORTED = !isWindows() || process.env.VSCODE_PID || process.env.CI;
 
 const STYLES: ITimbrStyles = {
   error: ['bold', 'red'],
@@ -44,6 +46,7 @@ export class TimbrInstance extends EventEmitter {
   private _debuggers: string[] = [];
   private _colurs: IColurs;
   private _levels: string[];
+  private _symbols: ITimbrSymbols;
 
   stream: WritableStream;
   options: ITimbrOptions;
@@ -81,6 +84,14 @@ export class TimbrInstance extends EventEmitter {
       this[l] = this.logger.bind(this, l);
       return this;
     });
+
+    // Build symbols.
+    this._symbols = {
+      info: SYMBOLS_SUPPORTED ? 'ℹ' : 'i',
+      success: SYMBOLS_SUPPORTED ? '✔' : '√',
+      warning: SYMBOLS_SUPPORTED ? '⚠' : '!!',
+      alert: SYMBOLS_SUPPORTED ? '✖' : 'x'
+    };
 
   }
 
@@ -359,7 +370,7 @@ export class TimbrInstance extends EventEmitter {
 
   /**
    * Logger
-   * Private common logger method.
+   * : Common logger method.
    *
    * @param type the type of log message to log.
    * @param args the arguments to be logged.
@@ -409,7 +420,7 @@ export class TimbrInstance extends EventEmitter {
       return this;
 
     // Check if is loggable level.
-    if (level > activeLevel && !isResolve)
+    if (!isResolve && (level > activeLevel))
       return this;
 
     if (isFunction(last(clone))) {
@@ -618,6 +629,19 @@ export class TimbrInstance extends EventEmitter {
   }
 
   /**
+   * Symbol
+   * : Gets known symbol for terminal or returns empty string.
+   *
+   * @param name the name of the symbol to return.
+   */
+  symbol(name: string, styles: AnsiStyles | AnsiStyles[]) {
+    if (this._symbols[name])
+      name = this._symbols[name];
+    styles = toArray(styles, []);
+    return this._colurs.applyAnsi(name, styles);
+  }
+
+  /**
    * Write
    * : Directly outputs to stream after formatting.
    *
@@ -626,6 +650,17 @@ export class TimbrInstance extends EventEmitter {
   write(...args: any[]) {
     const obj = this.logger('write:resolve', ...args) as ITimbrEventData;
     this.stream.write(obj.message + EOL);
+  }
+
+  /**
+   * Concat
+   * : Same as write but concats to stream without line return appended.
+   *
+   * @param args the arguments to format and output.
+   */
+  concat(...args: any[]) {
+    const obj = this.logger('write:resolve', ...args) as ITimbrEventData;
+    this.stream.write(obj.message);
     return this;
   }
 

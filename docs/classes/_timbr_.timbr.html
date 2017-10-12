@@ -104,6 +104,7 @@
 							<h3>Methods</h3>
 							<ul class="tsd-index-list">
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited"><a href="_timbr_.timbr.html#addlistener" class="tsd-kind-icon">add<wbr>Listener</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a href="_timbr_.timbr.html#concat" class="tsd-kind-icon">concat</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter"><a href="_timbr_.timbr.html#create" class="tsd-kind-icon">create</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class"><a href="_timbr_.timbr.html#debug" class="tsd-kind-icon">debug</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a href="_timbr_.timbr.html#debugger" class="tsd-kind-icon">debugger</a></li>
@@ -127,6 +128,7 @@
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited"><a href="_timbr_.timbr.html#removelistener" class="tsd-kind-icon">remove<wbr>Listener</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a href="_timbr_.timbr.html#set" class="tsd-kind-icon">set</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited"><a href="_timbr_.timbr.html#setmaxlisteners" class="tsd-kind-icon">set<wbr>Max<wbr>Listeners</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a href="_timbr_.timbr.html#symbol" class="tsd-kind-icon">symbol</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class"><a href="_timbr_.timbr.html#trace" class="tsd-kind-icon">trace</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class"><a href="_timbr_.timbr.html#warn" class="tsd-kind-icon">warn</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a href="_timbr_.timbr.html#write" class="tsd-kind-icon">write</a></li>
@@ -149,7 +151,7 @@
 							<aside class="tsd-sources">
 								<p>Overrides <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#constructor">constructor</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L644">timbr.ts:644</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L679">timbr.ts:679</a></li>
 								</ul>
 							</aside>
 							<h4 class="tsd-parameters-title">Parameters</h4>
@@ -172,7 +174,7 @@
 					<aside class="tsd-sources">
 						<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#options">options</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L49">timbr.ts:49</a></li>
+							<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L52">timbr.ts:52</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -183,7 +185,7 @@
 					<aside class="tsd-sources">
 						<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#stream">stream</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L48">timbr.ts:48</a></li>
+							<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L51">timbr.ts:51</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -247,6 +249,39 @@
 						</li>
 					</ul>
 				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
+					<a name="concat" class="tsd-anchor"></a>
+					<h3>concat</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
+						<li class="tsd-signature tsd-kind-icon">concat<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">this</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#concat">concat</a></p>
+								<ul>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L661">timbr.ts:661</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Concat
+									: Same as write but concats to stream without line return appended.</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>the arguments to format and output.</p>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">this</span></h4>
+						</li>
+					</ul>
+				</section>
 				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
 					<a name="create" class="tsd-anchor"></a>
 					<h3>create</h3>
@@ -257,7 +292,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L712">timbr.ts:712</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L747">timbr.ts:747</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -304,7 +339,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L700">timbr.ts:700</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L735">timbr.ts:735</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -337,7 +372,7 @@
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#debugger">debugger</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L583">timbr.ts:583</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L594">timbr.ts:594</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -381,7 +416,7 @@
 										<li class="tsd-description">
 											<aside class="tsd-sources">
 												<ul>
-													<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L593">timbr.ts:593</a></li>
+													<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L604">timbr.ts:604</a></li>
 												</ul>
 											</aside>
 											<h4 class="tsd-parameters-title">Parameters</h4>
@@ -402,7 +437,7 @@
 										<li class="tsd-description">
 											<aside class="tsd-sources">
 												<ul>
-													<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L599">timbr.ts:599</a></li>
+													<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L610">timbr.ts:610</a></li>
 												</ul>
 											</aside>
 											<h4 class="tsd-parameters-title">Parameters</h4>
@@ -429,7 +464,7 @@
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#debuggers">debuggers</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L616">timbr.ts:616</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L627">timbr.ts:627</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -480,7 +515,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L656">timbr.ts:656</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L691">timbr.ts:691</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -532,7 +567,7 @@
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#exists">exists</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L540">timbr.ts:540</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L551">timbr.ts:551</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -565,7 +600,7 @@
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#exit">exit</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L638">timbr.ts:638</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L673">timbr.ts:673</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -598,7 +633,7 @@
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#get">get</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L550">timbr.ts:550</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L561">timbr.ts:561</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -655,7 +690,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L678">timbr.ts:678</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L713">timbr.ts:713</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -738,13 +773,13 @@
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#logger">logger</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L367">timbr.ts:367</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L378">timbr.ts:378</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
 								<div class="lead">
 									<p>Logger
-									Private common logger method.</p>
+									: Common logger method.</p>
 								</div>
 							</div>
 							<h4 class="tsd-parameters-title">Parameters</h4>
@@ -1035,7 +1070,7 @@
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#set">set</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L561">timbr.ts:561</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L572">timbr.ts:572</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1088,6 +1123,45 @@
 						</li>
 					</ul>
 				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
+					<a name="symbol" class="tsd-anchor"></a>
+					<h3>symbol</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
+						<li class="tsd-signature tsd-kind-icon">symbol<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, styles<span class="tsd-signature-symbol">: </span><a href="../modules/_interfaces_.html#ansistyles" class="tsd-signature-type">AnsiStyles</a><span class="tsd-signature-symbol"> | </span><a href="../modules/_interfaces_.html#ansistyles" class="tsd-signature-type">AnsiStyles</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#symbol">symbol</a></p>
+								<ul>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L637">timbr.ts:637</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Symbol
+									: Gets known symbol for terminal or returns empty string.</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>name: <span class="tsd-signature-type">string</span></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>the name of the symbol to return.</p>
+									</div>
+								</li>
+								<li>
+									<h5>styles: <a href="../modules/_interfaces_.html#ansistyles" class="tsd-signature-type">AnsiStyles</a><span class="tsd-signature-symbol"> | </span><a href="../modules/_interfaces_.html#ansistyles" class="tsd-signature-type">AnsiStyles</a><span class="tsd-signature-symbol">[]</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span>
+								<span class="tsd-signature-symbol"> | </span>
+								<span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span>
+							</h4>
+						</li>
+					</ul>
+				</section>
 				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
 					<a name="trace" class="tsd-anchor"></a>
 					<h3>trace</h3>
@@ -1098,7 +1172,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L689">timbr.ts:689</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L724">timbr.ts:724</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1130,7 +1204,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L667">timbr.ts:667</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L702">timbr.ts:702</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1156,14 +1230,14 @@
 					<a name="write" class="tsd-anchor"></a>
 					<h3>write</h3>
 					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
-						<li class="tsd-signature tsd-kind-icon">write<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">this</span></li>
+						<li class="tsd-signature tsd-kind-icon">write<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
 					</ul>
 					<ul class="tsd-descriptions">
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<p>Inherited from <a href="_timbr_.timbrinstance.html">TimbrInstance</a>.<a href="_timbr_.timbrinstance.html#write">write</a></p>
 								<ul>
-									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/0d6be80/src/timbr.ts#L626">timbr.ts:626</a></li>
+									<li>Defined in <a href="https://github.com/origin1tech/timbr/blob/bfbbea5/src/timbr.ts#L650">timbr.ts:650</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1181,7 +1255,7 @@
 									</div>
 								</li>
 							</ul>
-							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">this</span></h4>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
 						</li>
 					</ul>
 				</section>
@@ -1256,6 +1330,9 @@
 							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited">
 								<a href="_timbr_.timbr.html#addlistener" class="tsd-kind-icon">add<wbr>Listener</a>
 							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
+								<a href="_timbr_.timbr.html#concat" class="tsd-kind-icon">concat</a>
+							</li>
 							<li class=" tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
 								<a href="_timbr_.timbr.html#create" class="tsd-kind-icon">create</a>
 							</li>
@@ -1325,6 +1402,9 @@
 							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited">
 								<a href="_timbr_.timbr.html#setmaxlisteners" class="tsd-kind-icon">set<wbr>Max<wbr>Listeners</a>
 							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
+								<a href="_timbr_.timbr.html#symbol" class="tsd-kind-icon">symbol</a>
+							</li>
 							<li class=" tsd-kind-method tsd-parent-kind-class">
 								<a href="_timbr_.timbr.html#trace" class="tsd-kind-icon">trace</a>
 							</li>
@@ -1343,6 +1423,9 @@
 				<ul class="after-current">
 					<li class=" tsd-kind-class tsd-parent-kind-external-module">
 						<a href="_timbr_.timbrinstance.html" class="tsd-kind-icon">Timbr<wbr>Instance</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-not-exported">
+						<a href="../modules/_timbr_.html#symbols_supported" class="tsd-kind-icon">SYMBOLS_<wbr>SUPPORTED</a>
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-has-type-parameter">
 						<a href="../modules/_timbr_.html#create" class="tsd-kind-icon">create</a>

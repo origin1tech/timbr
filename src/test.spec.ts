@@ -56,6 +56,11 @@ describe('Timbr', () => {
     assert.deepEqual(result.error, err);
   });
 
+  it('should test write method.', () => {
+    const result = log.logger('write:resolve', 'some write message.') as ITimbrEventData;
+    assert.equal(result.message, 'some write message.');
+  });
+
   it('should handle converting message to an error.', () => {
     log.set('errorConstruct', true);
     const result = log.logger('error:resolve', 'converted to error.') as ITimbrEventData;

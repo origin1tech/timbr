@@ -16,6 +16,7 @@ var colurs_1 = require("colurs");
 var chek_1 = require("chek");
 var util_1 = require("util");
 var os_1 = require("os");
+var SYMBOLS_SUPPORTED = !chek_1.isWindows() || process.env.VSCODE_PID || process.env.CI;
 var STYLES = {
     error: ['bold', 'red'],
     warn: 'yellow',
@@ -78,6 +79,13 @@ var TimbrInstance = /** @class */ (function (_super) {
             _this[l] = _this.logger.bind(_this, l);
             return _this;
         });
+        // Build symbols.
+        _this._symbols = {
+            info: SYMBOLS_SUPPORTED ? 'ℹ' : 'i',
+            success: SYMBOLS_SUPPORTED ? '✔' : '√',
+            warning: SYMBOLS_SUPPORTED ? '⚠' : '!!',
+            alert: SYMBOLS_SUPPORTED ? '✖' : 'x'
+        };
         return _this;
     }
     /**
@@ -313,7 +321,7 @@ var TimbrInstance = /** @class */ (function (_super) {
     };
     /**
      * Logger
-     * Private common logger method.
+     * : Common logger method.
      *
      * @param type the type of log message to log.
      * @param args the arguments to be logged.
@@ -357,7 +365,7 @@ var TimbrInstance = /** @class */ (function (_super) {
             type !== this.options.level)
             return this;
         // Check if is loggable level.
-        if (level > activeLevel && !isResolve)
+        if (!isResolve && (level > activeLevel))
             return this;
         if (chek_1.isFunction(chek_1.last(clone))) {
             fn = clone.pop();
@@ -544,6 +552,18 @@ var TimbrInstance = /** @class */ (function (_super) {
         return this._debuggers;
     };
     /**
+     * Symbol
+     * : Gets known symbol for terminal or returns empty string.
+     *
+     * @param name the name of the symbol to return.
+     */
+    TimbrInstance.prototype.symbol = function (name, styles) {
+        if (this._symbols[name])
+            name = this._symbols[name];
+        styles = chek_1.toArray(styles, []);
+        return this._colurs.applyAnsi(name, styles);
+    };
+    /**
      * Write
      * : Directly outputs to stream after formatting.
      *
@@ -556,6 +576,20 @@ var TimbrInstance = /** @class */ (function (_super) {
         }
         var obj = this.logger.apply(this, ['write:resolve'].concat(args));
         this.stream.write(obj.message + os_1.EOL);
+    };
+    /**
+     * Concat
+     * : Same as write but concats to stream without line return appended.
+     *
+     * @param args the arguments to format and output.
+     */
+    TimbrInstance.prototype.concat = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var obj = this.logger.apply(this, ['write:resolve'].concat(args));
+        this.stream.write(obj.message);
         return this;
     };
     /**

@@ -119,11 +119,16 @@ log.warn(<span class="hljs-string">'some warning.'</span>);
 				<pre><code class="lang-ts">log.info(<span class="hljs-string">'just some important message.'</span>).exit();
 </code></pre>
 				<h4 id="log-wrap">Log &amp; Wrap</h4>
-				<p>Writes &quot;----&quot; before and after log message.</p>
+				<p>Writes &quot;----&quot; before and after log message using the .write() method.</p>
 				<pre><code class="lang-ts">log
   .write(<span class="hljs-string">'----'</span>)
   .info(<span class="hljs-string">'just some important message.'</span>)
   .write(<span class="hljs-string">'----'</span>);
+</code></pre>
+				<h4 id="log-concat">Log Concat</h4>
+				<p>Continually outputs to stream without line return.</p>
+				<p>Results in &#39;one, two&#39;.</p>
+				<pre><code class="lang-ts">log.concat(<span class="hljs-string">'one, '</span>).concat(<span class="hljs-string">'two'</span>);
 </code></pre>
 				<h4 id="debuggers">Debuggers</h4>
 				<p>The following will only output when the &quot;server&quot; debug group is active. By default if no debuggers are active the first debugger created will be activated.</p>
@@ -138,6 +143,16 @@ serverDebug.disable() <span class="hljs-comment">// disables the debugger.</span
 <span class="hljs-keyword">const</span> enabledDebug = log.debugger(<span class="hljs-string">'posts'</span>, <span class="hljs-literal">true</span>) <span class="hljs-comment">// creates and ensures enabled.</span>
 
 <span class="hljs-keyword">const</span> disabledDebug = log.debugger(<span class="hljs-string">'puts'</span>, <span class="hljs-literal">false</span>) <span class="hljs-comment">// creates and ensures disabled.</span>
+</code></pre>
+				<h4 id="log-symbols">Log Symbols</h4>
+				<p>Logs message with &#39;✔&#39; success character.</p>
+				<p>Supported symbols are &#39;info&#39;, &#39;success&#39;, &#39;warning&#39;, &#39;alert&#39;. You may also pass
+				any other supported unicode character if you wish for convenience.</p>
+				<pre><code class="lang-ts">log.write(<span class="hljs-string">'successfully copied files.'</span>, log.symbol(<span class="hljs-string">'success'</span>));
+
+<span class="hljs-comment">// With Color</span>
+
+log.write(<span class="hljs-string">'successfully copied files.'</span>, log.symbol(<span class="hljs-string">'success'</span>, <span class="hljs-string">'green'</span>));
 </code></pre>
 				<h2 id="advanced-usage">Advanced Usage</h2>
 				<p>Getting and setting options as well as using the event emitter.</p>

@@ -2,6 +2,13 @@
 
 List of changes by date/version.
 
+### 10.11.2017 (1.1.6)
+
+<table>
+  <tr><td>symbol()</td><td>add method to generate symbols for use in log messages.</td></tr>
+  <tr><td>concat()</td><td>add method to output to stream without line return.</td></tr>
+</table>
+
 ### 10.11.2017 (1.1.4-5)
 
 <table>

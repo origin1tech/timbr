@@ -51,6 +51,13 @@ export interface IStacktraceResult {
   miniStack: string;
 }
 
+export interface ITimbrSymbols {
+  info: string;
+  success: string;
+  warning: string;
+  alert: string;
+}
+
 export interface ITimbrOptions {
   stream?: WritableStream;
   timestamp?: boolean | 'time' | 'datetime';
