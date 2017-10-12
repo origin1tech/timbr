@@ -1,6 +1,6 @@
 {
   "name": "timbr",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Typescript seed.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",

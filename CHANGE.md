@@ -2,7 +2,7 @@
 
 List of changes by date/version.
 
-### 10.11.2017 (1.1.6)
+### 10.11.2017 (1.1.6-7)
 
 <table>
   <tr><td>symbol()</td><td>add method to generate symbols for use in log messages.</td></tr>
