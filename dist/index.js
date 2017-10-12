@@ -1,7 +1,7 @@
 "use strict";
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
 Object.defineProperty(exports, "__esModule", { value: true });
-var timbr_1 = require("./timbr");
-exports.Timbr = timbr_1.Timbr;
-exports.create = timbr_1.create;
-exports.get = timbr_1.get;
+__export(require("./timbr"));
 //# sourceMappingURL=index.js.map
