@@ -1,3 +1,2 @@
-import { Timbr } from './timbr';
 export * from './interfaces';
-export { Timbr };
+export { Timbr, create, get } from './timbr';

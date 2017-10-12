@@ -206,3 +206,5 @@ export declare class Timbr extends TimbrInstance {
      */
     create<L extends string>(options: ITimbrOptions, ...levels: L[]): ExtendWithMethods<TimbrInstance, L>;
 }
+export declare const create: <L extends string>(options?: ITimbrOptions, ...levels: L[]) => ExtendWithMethods<TimbrInstance, L>;
+export { create as get };

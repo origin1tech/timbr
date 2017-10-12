@@ -714,3 +714,9 @@ export class Timbr extends TimbrInstance {
   }
 
 }
+
+export const create = <L extends string>(options?: ITimbrOptions, ...levels: L[]): ExtendWithMethods<TimbrInstance, L> => {
+  return (new TimbrInstance(options, ...levels)) as ExtendWithMethods<TimbrInstance, L>;
+};
+
+export { create as get }; // backward compat.

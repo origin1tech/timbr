@@ -662,4 +662,12 @@ var Timbr = /** @class */ (function (_super) {
     return Timbr;
 }(TimbrInstance));
 exports.Timbr = Timbr;
+exports.create = function (options) {
+    var levels = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        levels[_i - 1] = arguments[_i];
+    }
+    return (new (TimbrInstance.bind.apply(TimbrInstance, [void 0, options].concat(levels)))());
+};
+exports.get = exports.create;
 //# sourceMappingURL=timbr.js.map

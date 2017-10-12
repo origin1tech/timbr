@@ -38,11 +38,11 @@ In order to create custom log levels you must specify each level in the order of
 
 Timbr will try to automatically pick the **errorLevel**, **debugLevel** based on the provided custom levels. Timbr will also try to automatically pick colors based on severity or choose a random color. If you wish to provide your own ansi styles you may do so in the **options.styles** property. Style keys should match the levels you provided in the Timbr constructor. Styles may be strings or arrays of strings. For valid styles you can import **AnsiStyles** when using TypeScript.
 
-Below example uses **syslog** levels.
+Below example uses **syslog** levels for creating custom Timbr instance and methods.
 
 ```ts
-import { Timbr } from 'timbr';
-const log = new Timbr(/* options or null */, 'EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG');
+import { create } from 'timbr';
+const log = create(/* options or null */, 'EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG');
 ```
 
 ## Log Levels

@@ -2,6 +2,12 @@
 
 List of changes by date/version.
 
+### 10.11.2017 (1.1.4)
+
+<table>
+  <tr><td>create()</td><td>export create method to allow for directly creating Timbr instances.</td></tr>
+</table>
+
 ### 10.8.2017 (1.1.2-3)
 
 <table>

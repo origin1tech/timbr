@@ -86,9 +86,9 @@ log.warn(<span class="hljs-string">'some warning.'</span>);
 				<h4 id="custom-levels">Custom Levels</h4>
 				<p>In order to create custom log levels you must specify each level in the order of worse to least in severity. Meaning errors would be 0 with debug type levels at the highest.</p>
 				<p>Timbr will try to automatically pick the <strong>errorLevel</strong>, <strong>debugLevel</strong> based on the provided custom levels. Timbr will also try to automatically pick colors based on severity or choose a random color. If you wish to provide your own ansi styles you may do so in the <strong>options.styles</strong> property. Style keys should match the levels you provided in the Timbr constructor. Styles may be strings or arrays of strings. For valid styles you can import <strong>AnsiStyles</strong> when using TypeScript.</p>
-				<p>Below example uses <strong>syslog</strong> levels.</p>
-				<pre><code class="lang-ts"><span class="hljs-keyword">import</span> { Timbr } <span class="hljs-keyword">from</span> <span class="hljs-string">'timbr'</span>;
-<span class="hljs-keyword">const</span> log = <span class="hljs-keyword">new</span> Timbr(<span class="hljs-comment">/* options or null */</span>, <span class="hljs-string">'EMERGENCY'</span>, <span class="hljs-string">'ALERT'</span>, <span class="hljs-string">'CRITICAL'</span>, <span class="hljs-string">'ERROR'</span>, <span class="hljs-string">'WARNING'</span>, <span class="hljs-string">'NOTICE'</span>, <span class="hljs-string">'INFO'</span>, <span class="hljs-string">'DEBUG'</span>);
+				<p>Below example uses <strong>syslog</strong> levels for creating custom Timbr instance and methods.</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">import</span> { create } <span class="hljs-keyword">from</span> <span class="hljs-string">'timbr'</span>;
+<span class="hljs-keyword">const</span> log = create(<span class="hljs-comment">/* options or null */</span>, <span class="hljs-string">'EMERGENCY'</span>, <span class="hljs-string">'ALERT'</span>, <span class="hljs-string">'CRITICAL'</span>, <span class="hljs-string">'ERROR'</span>, <span class="hljs-string">'WARNING'</span>, <span class="hljs-string">'NOTICE'</span>, <span class="hljs-string">'INFO'</span>, <span class="hljs-string">'DEBUG'</span>);
 </code></pre>
 				<h2 id="log-levels">Log Levels</h2>
 				<p>Timbr supports the following log methods by default.</p>
