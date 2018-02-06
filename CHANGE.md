@@ -2,6 +2,17 @@
 
 List of changes by date/version.
 
+### 2.5.2018 (2.0.0)
+
+<table>
+  <tr><td>init</td><td>add method to create default log level/methods with options.</td></tr>
+  <tr><td>options.debuggers</td><td>remove from options in favor of just instantiating.</td></tr>
+  <tr><td>options.timestamp</td><td>all passing function for custom timestamp.</td></tr>
+  <tr><td>create</td><td>allow passing complete log level config when creating log instance..</td></tr>
+  <tr><td>Timbr</td><td>remove Timbr class in favor of create method.</td></tr>
+  <tr><td>options.styles</td><td>remove styles from options in favor of passing complete log level config in create method.</td></tr>
+</table>
+
 ### 10.11.2017 (1.1.6-7)
 
 <table>

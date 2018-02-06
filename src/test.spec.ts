@@ -5,12 +5,18 @@ const expect = chai.expect;
 const should = chai.should;
 const assert = chai.assert;
 
-import { Timbr, ITimbrEventData, create } from './';
+import { ITimbrEventData, timbr as log, create } from './';
 
-const log = new Timbr();
 // const logUser = log.create(null, 'emergency', 'alert', 'critical', 'notify');
 
-const logUser = create(null, 'emergency', 'alert', 'critical', 'notify');
+const levels = {
+  emergency: [],
+  alert: [],
+  critical: [],
+  notify: []
+};
+
+const logUser = create(null, levels);
 
 describe('Timbr', () => {
 

@@ -15,9 +15,19 @@ var path_1 = require("path");
 var colurs_1 = require("colurs");
 var chek_1 = require("chek");
 var util_1 = require("util");
-var os_1 = require("os");
-var SYMBOLS_SUPPORTED = !chek_1.isWindows() || process.env.VSCODE_PID || process.env.CI;
-var STYLES = {
+var IS_SYMBOLS_SUPPORTED = !chek_1.isWindows() || process.env.VSCODE_PID || process.env.CI;
+var EOL = '\n';
+var colurs = new colurs_1.Colurs();
+// Build symbols.
+var SYMBOLS = {
+    error: IS_SYMBOLS_SUPPORTED ? '✖' : 'x',
+    warn: IS_SYMBOLS_SUPPORTED ? '⚠' : '!!',
+    info: IS_SYMBOLS_SUPPORTED ? 'ℹ' : 'i',
+    trace: IS_SYMBOLS_SUPPORTED ? '◎' : 'o',
+    debug: IS_SYMBOLS_SUPPORTED ? '✱' : '*',
+    ok: IS_SYMBOLS_SUPPORTED ? '✔' : '√'
+};
+exports.LOG_LEVELS = {
     error: ['bold', 'red'],
     warn: 'yellow',
     info: 'green',
@@ -41,97 +51,99 @@ var DEFAULTS = {
     miniStack: false,
     timestamp: 'time',
     debugLevel: 'debug',
-    debuggers: [],
     debugAuto: true,
-    debugOnly: false,
-    styles: STYLES,
-    enabled: true,
+    debugOnly: false // when debugging only show debug level messages.
 };
-var TimbrInstance = /** @class */ (function (_super) {
-    __extends(TimbrInstance, _super);
-    function TimbrInstance(options) {
-        var levels = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            levels[_i - 1] = arguments[_i];
-        }
+var Timbr = (function (_super) {
+    __extends(Timbr, _super);
+    function Timbr(options, levels) {
         var _this = _super.call(this) || this;
         _this._debuggers = [];
-        _this.options = chek_1.extend({}, DEFAULTS, options);
-        // Normalizes when custom.
-        _this._levels = levels;
-        _this.normalizeLevels();
-        if (_this.options.errorCapture)
-            _this.toggleExceptionHandler(true);
-        _this.stream = _this.options.stream || process.stdout;
-        _this._colurs = new colurs_1.Colurs({ enabled: _this.options.colorize });
-        // initialized with debuggers set them.
-        if (_this.options.debuggers.length)
-            _this._debuggers = chek_1.isString(_this.options.debuggers) ? [_this.options.debuggers] : _this.options.debuggers;
-        if ((chek_1.isDebug() || process.env.DEBUG) && _this.options.debugAuto) {
-            var debugLevel = _this.options.debugLevel;
-            if (~levels.indexOf(debugLevel))
-                _this.options.level = debugLevel;
-            if (process.env.DEBUG)
-                _this.addDebugger(process.env.DEBUG);
-        }
-        // Init methods.
-        levels.forEach(function (l, i) {
-            _this[l] = _this.logger.bind(_this, l);
-            return _this;
-        });
-        // Build symbols.
-        _this._symbols = {
-            info: SYMBOLS_SUPPORTED ? 'ℹ' : 'i',
-            success: SYMBOLS_SUPPORTED ? '✔' : '√',
-            warning: SYMBOLS_SUPPORTED ? '⚠' : '!!',
-            alert: SYMBOLS_SUPPORTED ? '✖' : 'x'
-        };
+        _this._symbols = SYMBOLS;
+        _this.init(options, levels);
         return _this;
     }
     /**
-     * Normalize Levels
-     * : Normalizes log levels ensuring error, exit and debug levels as well as styles.
+     * Init
+     * Initializes intance using options.
      *
-     * @param levels custom log levels if provided.
+     * @param options Timbr options.
+     * @param levels the levels to use for logging.
      */
-    TimbrInstance.prototype.normalizeLevels = function () {
+    Timbr.prototype.init = function (options, levels) {
         var _this = this;
-        var levels = this._levels;
-        var baseStyles = [
-            'red',
-            'yellow',
-            'green',
-            'cyan',
-            'blue',
-            'magenta',
-            'gray'
-        ];
+        options = this.options = chek_1.extend({}, DEFAULTS, this.options, options);
+        colurs.setOption('enabled', this.options.colorize);
+        levels = levels || this._levels;
+        if (chek_1.isEmpty(levels))
+            throw new Error('Cannot init Timbr using levels of undefined.');
+        this._levels = levels;
+        this._levelKeys = chek_1.keys(levels);
+        this.normalizeLevels();
+        // Toggle the exception handler.
+        this.toggleExceptionHandler(true);
+        this.stream = options.stream || this.stream || process.stdout;
+        console.log(chek_1.isDebug());
+        console.log(process.env);
+        if ((chek_1.isDebug() || process.env.DEBUG) && options.debugAuto) {
+            var debugLevel = options.debugLevel;
+            if (~this._levelKeys.indexOf(debugLevel))
+                options.level = debugLevel;
+            if (process.env.DEBUG)
+                this.addDebugger(process.env.DEBUG);
+        }
+        // Init methods.
+        this._levelKeys.forEach(function (l, i) {
+            _this[l] = _this.logger.bind(_this, l);
+        });
+    };
+    /**
+     * Normalize Levels
+     * Normalizes log levels ensuring error, exit and debug levels as well as styles.
+     */
+    Timbr.prototype.normalizeLevels = function () {
+        for (var k in this._levels) {
+            if (!chek_1.isPlainObject(this._levels[k])) {
+                var level_1 = this._levels[k];
+                level_1 = {
+                    label: k,
+                    styles: chek_1.toArray(level_1, []),
+                    symbol: null,
+                    symbolPos: 'after'
+                };
+                this._levels[k] = level_1;
+            }
+            else {
+                var lvl = this._levels[k];
+                this._levels[k] = chek_1.extend({}, lvl);
+                lvl.label = lvl.label || k;
+                lvl.styles = chek_1.toArray(lvl.styles, []);
+            }
+        }
+        var levelKeys = this._levelKeys;
         var level = this.options.level;
         var debugLevel = this.options.debugLevel;
         var errorLevel = this.options.errorLevel;
         var exitLevel = this.options.errorExit;
         var tmpLevel = level;
         if (chek_1.isNumber(level))
-            tmpLevel = levels[level] || 'info';
-        if (!~levels.indexOf(tmpLevel))
-            tmpLevel = chek_1.last(levels);
+            tmpLevel = levelKeys[level] || 'info';
+        // ensure a level, if none select last.
+        if (!~levelKeys.indexOf(tmpLevel))
+            tmpLevel = chek_1.last(levelKeys);
         level = this.options.level = tmpLevel;
         // ensure debug level.
-        if (!~levels.indexOf(debugLevel))
-            this.options.debugLevel = chek_1.last(this._levels);
+        if (!~levelKeys.indexOf(debugLevel))
+            this.options.debugLevel = chek_1.last(this._levelKeys);
         // ensure error level
-        if (!~levels.indexOf(errorLevel))
-            this.options.errorLevel = chek_1.first(this._levels);
-        levels.forEach(function (l, i) {
-            if (!_this.options.styles[l])
-                _this.options.styles[l] = baseStyles[i] || (Math.floor(Math.random() * 6) + 1);
-        });
+        if (!~levelKeys.indexOf(errorLevel))
+            this.options.errorLevel = chek_1.first(this._levelKeys);
     };
     /**
      * Is Debug
      * Returns true if level matches debug level.
      */
-    TimbrInstance.prototype.isDebugging = function () {
+    Timbr.prototype.isDebugging = function () {
         return this.options.level === this.options.debugLevel;
     };
     /**
@@ -141,8 +153,8 @@ var TimbrInstance = /** @class */ (function (_super) {
      * @param level the key to get the index for.
      * @param arr the array to be inspected.
      */
-    TimbrInstance.prototype.getIndex = function (level) {
-        return this._levels.indexOf(level);
+    Timbr.prototype.getIndex = function (level) {
+        return this._levelKeys.indexOf(level);
     };
     /**
      * Colorize
@@ -151,10 +163,10 @@ var TimbrInstance = /** @class */ (function (_super) {
      * @param val the value to be colorized.
      * @param styles the styles to be applied.
      */
-    TimbrInstance.prototype.colorize = function (val, styles) {
+    Timbr.prototype.colorize = function (val, styles) {
         if (!styles || !styles.length)
             return val;
-        return this._colurs.applyAnsi(val, styles);
+        return colurs.applyAnsi(val, styles);
     };
     /**
      * Colorize If
@@ -163,7 +175,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      * @param val the value to be colorized.
      * @param styles the styles to be applied.
      */
-    TimbrInstance.prototype.colorizeIf = function (val, styles) {
+    Timbr.prototype.colorizeIf = function (val, styles) {
         if (!this.options.colorize)
             return val;
         return this.colorize(val, styles);
@@ -176,7 +188,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      * @param prune number of stack frames to prune.
      * @param depth the depth to trace.
      */
-    TimbrInstance.prototype.parseStack = function (stack, prune, depth) {
+    Timbr.prototype.parseStack = function (stack, prune, depth) {
         var _this = this;
         prune = prune || 0;
         depth = depth || this.options.stackDepth;
@@ -185,7 +197,7 @@ var TimbrInstance = /** @class */ (function (_super) {
         var frames = [];
         var traced = [];
         var miniStack;
-        stack.split(os_1.EOL)
+        stack.split(EOL)
             .slice(prune)
             .forEach(function (s, i) {
             if (i >= depth && depth !== 0)
@@ -231,15 +243,32 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param format the format to return.
      */
-    TimbrInstance.prototype.getTimestamp = function (format) {
+    Timbr.prototype.getTimestamp = function (format) {
         format = format || this.options.timestamp;
-        var timestamp = (new Date()).toISOString();
-        var split = timestamp.replace('Z', '').split('T');
-        if (format === true)
-            return timestamp;
-        if (format === 'time')
-            return split[1];
-        return split[0] + " " + split[1];
+        var config = {
+            format: 'time',
+            styles: 'gray',
+            date: new Date(),
+            timestamp: null
+        };
+        if (chek_1.isPlainObject(format)) {
+            chek_1.extend(config, format);
+        }
+        else {
+            config.format = format;
+        }
+        if (chek_1.isFunction(config.format)) {
+            config.timestamp = config.format();
+        }
+        else {
+            var ts = config.date.toISOString();
+            var split = ts.replace('Z', '').split('T');
+            if (config.format === 'time')
+                config.timestamp = split[1];
+            else
+                config.timestamp = split[0] + " " + split[1];
+        }
+        return config;
     };
     /**
      * Uncaught Exception
@@ -247,7 +276,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param err the error caught by process uncaughtException.
      */
-    TimbrInstance.prototype.uncaughtException = function (err) {
+    Timbr.prototype.uncaughtException = function (err) {
         var _this = this;
         var errorLevel = this.options.errorLevel;
         if (!this.options.errorCapture || !this.exists(errorLevel))
@@ -265,7 +294,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param capture whether to capture uncaught exceptions or not.
      */
-    TimbrInstance.prototype.toggleExceptionHandler = function (capture) {
+    Timbr.prototype.toggleExceptionHandler = function (capture) {
         if (!capture)
             process.removeListener('uncaughtException', this.uncaughtException.bind(this));
         else
@@ -277,7 +306,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param group the debugger group to add.
      */
-    TimbrInstance.prototype.addDebugger = function (group) {
+    Timbr.prototype.addDebugger = function (group) {
         if (!~this._debuggers.indexOf(group))
             this._debuggers.push(group);
     };
@@ -287,8 +316,17 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param group the debugger group to remove.
      */
-    TimbrInstance.prototype.removeDebugger = function (group) {
+    Timbr.prototype.removeDebugger = function (group) {
         this._debuggers = this._debuggers.filter(function (d) { return d !== group; });
+    };
+    /**
+     * Exists Debugger
+     * Checks if a debugger exists.
+     *
+     * @param group the group to be checked.
+     */
+    Timbr.prototype.existsDebugger = function (group) {
+        return ~this._debuggers.indexOf(group);
     };
     /**
      * Pad
@@ -297,12 +335,12 @@ var TimbrInstance = /** @class */ (function (_super) {
      * @param type the log level type.
      * @param offset additional offset.
      */
-    TimbrInstance.prototype.pad = function (type, offset) {
+    Timbr.prototype.pad = function (type, offset) {
         if (!this.options.padLevels)
             return '';
         var max = 0;
         var len = type.length;
-        var i = this._levels.length;
+        var i = this._levelKeys.length;
         var padding = '';
         offset = chek_1.isString(offset) ? offset.length : offset;
         offset = offset || 0;
@@ -312,8 +350,11 @@ var TimbrInstance = /** @class */ (function (_super) {
                 s += ' ';
             return s;
         }
+        var debugLevels = (this._debuggers || []).map(function (l) { return "debug-" + l; });
+        var levels = this._levelKeys.concat(debugLevels);
         while (i--) {
-            var diff = this._levels[i].length - len;
+            //  const diff = this._levelKeys[i].length - len;
+            var diff = levels[i].length - len;
             if (diff > 0)
                 padding = pad(diff + offset);
         }
@@ -326,25 +367,23 @@ var TimbrInstance = /** @class */ (function (_super) {
      * @param type the type of log message to log.
      * @param args the arguments to be logged.
      */
-    TimbrInstance.prototype.logger = function (type) {
+    Timbr.prototype.logger = function (type) {
         var args = [];
         for (var _i = 1; _i < arguments.length; _i++) {
             args[_i - 1] = arguments[_i];
         }
-        if (!this.options.enabled)
-            return this;
         var clone = args.slice(0);
         var origType = type;
-        var splitType = type.split(':');
+        var splitType = type ? type.split(':') : null;
         type = splitType[0];
         // Flags used internally.
         var isResolve = chek_1.contains(splitType, 'resolve');
         var isException = chek_1.contains(splitType, 'exception');
         var debugGroup = type === 'debug' && splitType[1];
-        var knownType = chek_1.contains(this._levels, type);
+        var knownType = chek_1.contains(this._levelKeys, type);
         var emitType = !debugGroup ? splitType[0] : origType;
         var stackTrace;
-        var err, errMsg, meta, metaFormatted, tsFmt, ts, msg, normalized, rawMsg, errType;
+        var err, errMsg, meta, metaFormatted, tsFmt, tsDate, msg, normalized, rawMsg, errType;
         var event;
         var fn = chek_1.noop;
         var result = [];
@@ -357,15 +396,16 @@ var TimbrInstance = /** @class */ (function (_super) {
             clone[0] = new Error(clone[0]);
             pruneTrace = 2;
         }
-        var level = this.getIndex(type);
-        var activeLevel = this.getIndex(this.options.level);
+        var level = (knownType ? this._levels[type] : null);
+        var idx = this.getIndex(type);
+        var activeIdx = this.getIndex(this.options.level);
         // If debugOnly and we are debugging ensure is debug level.
         if (this.options.debugOnly &&
             this.isDebugging() &&
             type !== this.options.level)
             return this;
         // Check if is loggable level.
-        if (!isResolve && (level > activeLevel))
+        if (!isResolve && (idx > activeIdx))
             return this;
         if (chek_1.isFunction(chek_1.last(clone))) {
             fn = clone.pop();
@@ -375,26 +415,28 @@ var TimbrInstance = /** @class */ (function (_super) {
         err = chek_1.isError(chek_1.first(clone)) ? clone.shift() : null;
         stackTrace = err ?
             this.parseStack(err.stack, pruneTrace) :
-            this.parseStack((new Error('get stack')).stack, 3);
+            this.parseStack((new Error('get stack')).stack, 2);
         // Add optional timestamp.
         if (this.options.timestamp) {
-            tsFmt = "" + this.getTimestamp();
-            ts = "" + this.getTimestamp(true);
-            result.push(this.colorizeIf("[" + tsFmt + "]", 'magenta'));
+            var ts = this.getTimestamp();
+            tsFmt = ts.timestamp;
+            tsDate = ts.date;
+            result.push(this.colorizeIf("[" + tsFmt + "]", ts.styles));
         }
         // Add error type if not generic 'Error'.
         errType = err && err.name !== 'Error' ? ":" + err.name : '';
         // Add log label type.
         if (knownType && this.options.labelLevels) {
-            var styles = this.options.styles;
-            var styledType = this.colorizeIf(type, styles[type]);
+            var styledType = this.colorizeIf(type, level.styles);
             var styledDebugType = void 0;
+            var unstyledDebugType = '-' + debugGroup;
+            var padType = type;
             if (debugGroup) {
-                styledDebugType = this.colorizeIf(':' + debugGroup, 'gray');
+                styledDebugType = this.colorizeIf(unstyledDebugType, 'gray');
                 styledType += styledDebugType;
             }
             var padding = this.pad(type);
-            styledType += this.colorizeIf(errType, styles[type]);
+            styledType += this.colorizeIf(errType, level.styles);
             result.push(padding + styledType + ':');
         }
         // If error we need to build the message.
@@ -432,15 +474,15 @@ var TimbrInstance = /** @class */ (function (_super) {
             if (this.options.prettyStack)
                 suffix.push(util_1.format(util_1.inspect(stackTrace.frames, null, null, this.options.colorize)));
             else
-                suffix.push(stackTrace.stack.join(os_1.EOL));
+                suffix.push(stackTrace.stack.join(EOL));
         }
         msg = result.join(' ');
-        msg = (suffix.length ? msg + os_1.EOL + suffix.join(os_1.EOL) : msg) + os_1.EOL;
-        // Output to stream.
+        msg = (suffix.length ? msg + EOL + suffix.join(EOL) : msg) + EOL;
+        // Output to stream if not resolving event result.
         if (!isResolve)
             this.stream.write(msg);
         event = {
-            timestamp: ts,
+            timestamp: tsDate,
             type: type,
             message: rawMsg + (metaFormatted || ''),
             formatted: msg,
@@ -471,7 +513,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param level the key to check.
      */
-    TimbrInstance.prototype.exists = function (level) {
+    Timbr.prototype.exists = function (level) {
         return !!~this.getIndex(level);
     };
     /**
@@ -480,7 +522,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param key the option key to get.
      */
-    TimbrInstance.prototype.get = function (key) {
+    Timbr.prototype.getOption = function (key) {
         return this.options[key];
     };
     /**
@@ -490,7 +532,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      * @param key the key or options object to be set.
      * @param value the value for the key.
      */
-    TimbrInstance.prototype.set = function (key, value) {
+    Timbr.prototype.setOption = function (key, value) {
         var toggleExceptionHandler = key === 'errorCapture';
         if (chek_1.isPlainObject(key)) {
             var _keys = chek_1.keys(key);
@@ -509,15 +551,18 @@ var TimbrInstance = /** @class */ (function (_super) {
      * : Creates a new grouped debugger.
      *
      * @param group enables debugging by active group.
-     * @param enabled when true disables group.
      */
-    TimbrInstance.prototype.debugger = function (group, enabled) {
-        var _this = this;
+    Timbr.prototype.debugger = function (group) {
         // If no debuggers yet add unless explicitly disabled.
-        if ((!this._debuggers.length && enabled !== false) || enabled === true)
-            this.addDebugger(group);
-        if (enabled === false)
+        // if ((!this._debuggers.length && enabled !== false) || enabled === true)
+        //   this.addDebugger(group);
+        var _this = this;
+        // if (enabled === false)
+        //   this.removeDebugger(group);
+        if (this.existsDebugger(group))
             this.removeDebugger(group);
+        else
+            this.addDebugger(group);
         return {
             log: function () {
                 var args = [];
@@ -527,7 +572,6 @@ var TimbrInstance = /** @class */ (function (_super) {
                 if (!~_this._debuggers.indexOf(group))
                     return;
                 _this.logger.apply(_this, ["debug:" + group].concat(args));
-                return _this;
             },
             write: function () {
                 var args = [];
@@ -537,18 +581,17 @@ var TimbrInstance = /** @class */ (function (_super) {
                 if (!~_this._debuggers.indexOf(group))
                     return;
                 _this.write.apply(_this, args);
-                return _this;
             },
-            exit: this.exit,
-            enable: this.addDebugger.bind(this, group),
-            disable: this.removeDebugger.bind(this, group)
+            exit: this.exit
+            // enable: this.addDebugger.bind(this, group),
+            // disable: this.removeDebugger.bind(this, group)
         };
     };
     /**
      * Debuggers
      * : Returns list of debuggers.
      */
-    TimbrInstance.prototype.debuggers = function () {
+    Timbr.prototype.debuggers = function () {
         return this._debuggers;
     };
     /**
@@ -557,11 +600,13 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param name the name of the symbol to return.
      */
-    TimbrInstance.prototype.symbol = function (name, styles) {
+    Timbr.prototype.symbol = function (name, styles) {
         if (this._symbols[name])
             name = this._symbols[name];
         styles = chek_1.toArray(styles, []);
-        return this._colurs.applyAnsi(name, styles);
+        if (!styles.length)
+            return name;
+        return colurs.applyAnsi(name, styles);
     };
     /**
      * Write
@@ -569,13 +614,13 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param args arguments to output to stream directly.
      */
-    TimbrInstance.prototype.write = function () {
+    Timbr.prototype.write = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
         var obj = this.logger.apply(this, ['write:resolve'].concat(args));
-        this.stream.write(obj.message + os_1.EOL);
+        this.stream.write(obj.message + EOL);
     };
     /**
      * Concat
@@ -583,7 +628,7 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param args the arguments to format and output.
      */
-    TimbrInstance.prototype.concat = function () {
+    Timbr.prototype.concat = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
@@ -598,110 +643,86 @@ var TimbrInstance = /** @class */ (function (_super) {
      *
      * @param code the exit code if any.
      */
-    TimbrInstance.prototype.exit = function (code) {
+    Timbr.prototype.exit = function (code) {
         process.exit(code || 0);
     };
-    return TimbrInstance;
-}(events_1.EventEmitter));
-exports.TimbrInstance = TimbrInstance;
-var Timbr = /** @class */ (function (_super) {
-    __extends(Timbr, _super);
-    function Timbr(options) {
-        return _super.call(this, options, 'error', 'warn', 'info', 'trace', 'debug') || this;
-    }
+    // DEPRECATED
     /**
-     * Error
-     * : Used for logging application errors.
+     * Get
+     * Gets a current option value.
      *
-     * @param args arguments to be logged.
+     * @param key the option key to get.
      */
-    Timbr.prototype.error = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
-        this.logger.apply(this, ['error'].concat(args));
-        return this;
+    Timbr.prototype.get = function (key) {
+        return this.options[key];
     };
     /**
-     * Warn
-     * : Used for logging application warning.
+     * Set
+     * Sets options for Logger.
      *
-     * @param args arguments to be logged.
+     * @param key the key or options object to be set.
+     * @param value the value for the key.
      */
-    Timbr.prototype.warn = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
+    Timbr.prototype.set = function (key, value) {
+        var toggleExceptionHandler = key === 'errorCapture';
+        if (chek_1.isPlainObject(key)) {
+            var _keys = chek_1.keys(key);
+            this.options = chek_1.extend({}, this.options, key);
+            if (chek_1.contains(_keys, 'errorCapture'))
+                toggleExceptionHandler = true;
         }
-        this.logger.apply(this, ['warn'].concat(args));
-        return this;
-    };
-    /**
-     * Info
-     * : Used for logging application information.
-     *
-     * @param args arguments to be logged.
-     */
-    Timbr.prototype.info = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
+        else {
+            this.options[key] = value;
         }
-        this.logger.apply(this, ['info'].concat(args));
-        return this;
-    };
-    /**
-     * Trace
-     * : Used for logging application tracing.
-     *
-     * @param args arguments to be logged.
-     */
-    Timbr.prototype.trace = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
-        this.logger.apply(this, ['trace'].concat(args));
-        return this;
-    };
-    /**
-     * Debug
-     * : Used for debugging application.
-     *
-     * @param args arguments to be logged.
-     */
-    Timbr.prototype.debug = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
-        this.logger.apply(this, ['debug'].concat(args));
-        return this;
-    };
-    /**
-     * Factory
-     * : Factory to create custom instance of Timbr.
-     *
-     * @param options the Timbr options.
-     * @param levels the custom log levels to extend Timbr with.
-     */
-    Timbr.prototype.create = function (options) {
-        var levels = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            levels[_i - 1] = arguments[_i];
-        }
-        return (new (TimbrInstance.bind.apply(TimbrInstance, [void 0, options].concat(levels)))());
+        if (toggleExceptionHandler)
+            this.toggleExceptionHandler(this.options.errorCapture);
     };
     return Timbr;
-}(TimbrInstance));
+}(events_1.EventEmitter));
 exports.Timbr = Timbr;
-exports.create = function (options) {
-    var levels = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        levels[_i - 1] = arguments[_i];
+function intersect(first, second) {
+    var result = {};
+    for (var id in first) {
+        result[id] = first[id];
     }
-    return (new (TimbrInstance.bind.apply(TimbrInstance, [void 0, options].concat(levels)))());
-};
-exports.get = exports.create;
+    for (var id in second) {
+        if (!result.hasOwnProperty(id)) {
+            result[id] = second[id];
+        }
+    }
+    return result;
+}
+/**
+ * Create
+ * Creates a new instance of Timbr.
+ *
+ * @param options Timbr options.
+ * @param levels the log levels to be used.
+ */
+function create(options, levels) {
+    var logger;
+    var instance = new Timbr(options, levels);
+    function Logger() {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        if (args.length) {
+            var obj = instance.logger.apply(instance, ['log:resolve'].concat(args));
+            instance.stream.write(obj.message + EOL);
+        }
+        return logger;
+    }
+    for (var id in instance) {
+        Logger[id] = instance[id];
+    }
+    // logger = intersect(Logger, instance);
+    return Logger;
+}
+exports.create = create;
+// Inits a default instance.
+function init(options) {
+    return create(options, exports.LOG_LEVELS);
+}
+exports.init = init;
 //# sourceMappingURL=timbr.js.map

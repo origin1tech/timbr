@@ -4,7 +4,7 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"taskName": "build",
+			"label": "build",
 			"type": "shell",
 			"windows": {
 				"command": "tsc",
@@ -38,7 +38,7 @@
 			}
 		},
 		{
-			"taskName": "watch",
+			"label": "watch",
 			"windows": {
 				"command": "tsc",
 				"args": [

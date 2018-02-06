@@ -1,19 +1,33 @@
 /// <reference types="node" />
 import { EventEmitter } from 'events';
-import { WritableStream, ITimbrEventData, ITimbrOptions, ExtendWithMethods, OptionKeys, AnsiStyles } from './interfaces';
-export declare class TimbrInstance extends EventEmitter {
+import { ITimbrEventData, ITimbrOptions, OptionKeys, AnsiStyles, ITimbrLevels, TimbrUnion, ITimbrDebugger } from './interfaces';
+export declare const LOG_LEVELS: {
+    error: string[];
+    warn: string;
+    info: string;
+    trace: string;
+    debug: string;
+};
+export declare type LogLevelKeys = keyof typeof LOG_LEVELS;
+export declare class Timbr extends EventEmitter {
     private _debuggers;
-    private _colurs;
     private _levels;
+    private _levelKeys;
     private _symbols;
-    stream: WritableStream;
+    stream: NodeJS.WritableStream;
     options: ITimbrOptions;
-    constructor(options?: ITimbrOptions, ...levels: string[]);
+    constructor(options?: ITimbrOptions, levels?: ITimbrLevels);
+    /**
+     * Init
+     * Initializes intance using options.
+     *
+     * @param options Timbr options.
+     * @param levels the levels to use for logging.
+     */
+    private init(options?, levels?);
     /**
      * Normalize Levels
-     * : Normalizes log levels ensuring error, exit and debug levels as well as styles.
-     *
-     * @param levels custom log levels if provided.
+     * Normalizes log levels ensuring error, exit and debug levels as well as styles.
      */
     private normalizeLevels();
     /**
@@ -44,7 +58,7 @@ export declare class TimbrInstance extends EventEmitter {
      * @param val the value to be colorized.
      * @param styles the styles to be applied.
      */
-    private colorizeIf(val, styles);
+    private colorizeIf(val, styles?);
     /**
      * Parse Stack
      * Simple stack parser to limit and stylize stacktraces.
@@ -90,6 +104,13 @@ export declare class TimbrInstance extends EventEmitter {
      */
     private removeDebugger(group);
     /**
+     * Exists Debugger
+     * Checks if a debugger exists.
+     *
+     * @param group the group to be checked.
+     */
+    private existsDebugger(group);
+    /**
      * Pad
      * : Gets padding for level type.
      *
@@ -118,7 +139,7 @@ export declare class TimbrInstance extends EventEmitter {
      *
      * @param key the option key to get.
      */
-    get<T>(key: OptionKeys): T;
+    getOption<T>(key: OptionKeys): T;
     /**
      * Set
      * Sets options for Logger.
@@ -126,21 +147,14 @@ export declare class TimbrInstance extends EventEmitter {
      * @param key the key or options object to be set.
      * @param value the value for the key.
      */
-    set(key: OptionKeys | ITimbrOptions, value?: any): void;
+    setOption(key: OptionKeys | ITimbrOptions, value?: any): void;
     /**
      * Debugger
      * : Creates a new grouped debugger.
      *
      * @param group enables debugging by active group.
-     * @param enabled when true disables group.
      */
-    debugger(group: string, enabled?: boolean): {
-        log: (...args: any[]) => this;
-        write: (...args: any[]) => this;
-        exit: (code?: number) => void;
-        enable: any;
-        disable: any;
-    };
+    debugger(group: string): ITimbrDebugger;
     /**
      * Debuggers
      * : Returns list of debuggers.
@@ -152,7 +166,7 @@ export declare class TimbrInstance extends EventEmitter {
      *
      * @param name the name of the symbol to return.
      */
-    symbol(name: string, styles: AnsiStyles | AnsiStyles[]): string | any[];
+    symbol(name: string, styles?: AnsiStyles | AnsiStyles[]): string | any[];
     /**
      * Write
      * : Directly outputs to stream after formatting.
@@ -174,52 +188,28 @@ export declare class TimbrInstance extends EventEmitter {
      * @param code the exit code if any.
      */
     exit(code?: number): void;
+    /**
+     * Get
+     * Gets a current option value.
+     *
+     * @param key the option key to get.
+     */
+    get<T>(key: OptionKeys): T;
+    /**
+     * Set
+     * Sets options for Logger.
+     *
+     * @param key the key or options object to be set.
+     * @param value the value for the key.
+     */
+    set(key: OptionKeys | ITimbrOptions, value?: any): void;
 }
-export declare class Timbr extends TimbrInstance {
-    constructor(options?: ITimbrOptions);
-    /**
-     * Error
-     * : Used for logging application errors.
-     *
-     * @param args arguments to be logged.
-     */
-    error(...args: any[]): this;
-    /**
-     * Warn
-     * : Used for logging application warning.
-     *
-     * @param args arguments to be logged.
-     */
-    warn(...args: any[]): this;
-    /**
-     * Info
-     * : Used for logging application information.
-     *
-     * @param args arguments to be logged.
-     */
-    info(...args: any[]): this;
-    /**
-     * Trace
-     * : Used for logging application tracing.
-     *
-     * @param args arguments to be logged.
-     */
-    trace(...args: any[]): this;
-    /**
-     * Debug
-     * : Used for debugging application.
-     *
-     * @param args arguments to be logged.
-     */
-    debug(...args: any[]): this;
-    /**
-     * Factory
-     * : Factory to create custom instance of Timbr.
-     *
-     * @param options the Timbr options.
-     * @param levels the custom log levels to extend Timbr with.
-     */
-    create<L extends string>(options: ITimbrOptions, ...levels: L[]): ExtendWithMethods<TimbrInstance, L>;
-}
-export declare const create: <L extends string>(options?: ITimbrOptions, ...levels: L[]) => ExtendWithMethods<TimbrInstance, L>;
-export { create as get };
+/**
+ * Create
+ * Creates a new instance of Timbr.
+ *
+ * @param options Timbr options.
+ * @param levels the log levels to be used.
+ */
+export declare function create<L extends string>(options?: ITimbrOptions, levels?: ITimbrLevels): TimbrUnion<L>;
+export declare function init(options?: ITimbrOptions): TimbrUnion<LogLevelKeys>;

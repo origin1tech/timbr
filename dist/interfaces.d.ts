@@ -1,15 +1,27 @@
 /// <reference types="node" />
-import { EventEmitter } from 'events';
 import { IAnsiStyles } from 'colurs';
-export declare type RecordMethods<T, L extends string> = Record<L, {
-    (...args): T;
-}>;
-export declare type ExtendWithMethods<T, L extends string> = T & RecordMethods<T, L>;
+import { Timbr } from './timbr';
 export declare type EventCallback = (event: ITimbrEventData) => void;
 export declare type AnsiStyles = keyof IAnsiStyles;
 export declare type OptionKeys = keyof ITimbrOptions;
+export declare type TimbrSymbols = keyof ITimbrSymbols;
+export declare type TimestampCallback = () => string;
+export declare type TimestampFormat = 'time' | 'datetime' | TimestampCallback;
+export declare type TimbrMethod<L extends string> = (...args: any[]) => TimbrUnion<L>;
+export declare type TimbrUnion<L extends string> = ITimbr<L> & Record<L, TimbrMethod<L>>;
 export interface IMap<T> {
     [key: string]: T;
+}
+export interface ITimbrLevel {
+    label?: string;
+    styles?: AnsiStyles | AnsiStyles[];
+    symbol?: string | TimbrSymbols;
+    symbolPos?: 'before' | 'after';
+}
+export interface ITimbrLevels extends IMap<string | string[] | ITimbrLevel> {
+}
+export interface ITimbr<L extends string> extends Timbr {
+    (...args: any[]): TimbrUnion<L>;
 }
 export interface ITimbrEventData {
     timestamp: string;
@@ -20,18 +32,6 @@ export interface ITimbrEventData {
     args: any[];
     error?: Error;
     stackTrace?: IStacktraceFrame[];
-}
-export interface ITimbrStyles {
-    [key: string]: AnsiStyles | AnsiStyles[];
-}
-export interface WritableStream extends EventEmitter {
-    writable: boolean;
-    write(buffer: Buffer | string, cb?: Function): boolean;
-    write(str: string, encoding?: string, cb?: Function): boolean;
-    end(): void;
-    end(buffer: Buffer, cb?: Function): void;
-    end(str: string, cb?: Function): void;
-    end(str: string, encoding?: string, cb?: Function): void;
 }
 export interface IStacktraceFrame {
     method: string;
@@ -46,14 +46,24 @@ export interface IStacktraceResult {
     miniStack: string;
 }
 export interface ITimbrSymbols {
+    error: string;
+    warn: string;
     info: string;
-    success: string;
-    warning: string;
-    alert: string;
+    trace: string;
+    debug: string;
+    ok: string;
+}
+export interface ITimestamp {
+    format: TimestampFormat;
+    styles?: AnsiStyles | AnsiStyles[];
+}
+export interface ITimestampResult extends ITimestamp {
+    date: Date;
+    timestamp: string;
 }
 export interface ITimbrOptions {
-    stream?: WritableStream;
-    timestamp?: boolean | 'time' | 'datetime';
+    stream?: NodeJS.WritableStream;
+    timestamp?: TimestampFormat | ITimestamp;
     level?: string | number;
     padLevels?: boolean;
     labelLevels?: boolean;
@@ -68,9 +78,11 @@ export interface ITimbrOptions {
     prettyStack?: boolean;
     miniStack?: boolean;
     debugLevel?: string;
-    debuggers?: string | string[];
     debugAuto?: boolean;
     debugOnly?: boolean;
-    styles?: ITimbrStyles;
-    enabled?: boolean;
+}
+export interface ITimbrDebugger {
+    log(...args: any[]): void;
+    write(...args: any[]): void;
+    exit(code: number): void;
 }
