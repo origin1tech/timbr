@@ -54,7 +54,9 @@ const DEFAULTS: ITimbrOptions = {
 
 export class Timbr extends EventEmitter {
 
-  private _debuggers: string[] = [];
+  private _debuggers: IMap<ITimbrDebug> = {};
+  private _activeDebuggers: string[] = [];
+
   private _levels: ITimbrLevels;
   private _levelKeys: string[];
   private _symbols = SYMBOLS;
@@ -92,9 +94,6 @@ export class Timbr extends EventEmitter {
     this.toggleExceptionHandler(true);
 
     this.stream = options.stream || this.stream || process.stdout;
-
-    console.log(isDebug());
-    console.log(process.env);
 
     if ((isDebug() || process.env.DEBUG) && options.debugAuto) {
       const debugLevel = options.debugLevel;
@@ -355,33 +354,42 @@ export class Timbr extends EventEmitter {
 
   /**
    * Add Debugger
-   * : Adds a debugger group if does not already exist.
+   * : Adds a debugger namespace if does not already exist.
    *
-   * @param group the debugger group to add.
+   * @param namespace the debugger namespace to add.
+   * @param instance the debugger instance.
    */
-  private addDebugger(group: string) {
-    if (!~this._debuggers.indexOf(group))
-      this._debuggers.push(group);
+  private addDebugger(namespace: string, instance: ITimbrDebug) {
+    this._debuggers[namespace] = instance;
   }
 
   /**
    * Remove Debugger
-   * : Removes the specified group from debuggers.
+   * : Removes the specified namespace from debuggers.
    *
-   * @param group the debugger group to remove.
+   * @param namespace the debugger namespace to remove.
    */
-  private removeDebugger(group: string) {
-    this._debuggers = this._debuggers.filter(d => d !== group);
+  private destroyDebugger(namespace: string) {
+    this._activeDebuggers = this._activeDebuggers.filter(a => a !== namespace);
+    delete this._debuggers[namespace];
   }
 
   /**
-   * Exists Debugger
-   * Checks if a debugger exists.
+   * Get Debugger
+   * Gets a debugger.
    *
-   * @param group the group to be checked.
+   * @param namespace the namespace to get debugger by.
    */
-  private existsDebugger(group: string) {
-    return ~this._debuggers.indexOf(group);
+  private getDebugger(namespace: string) {
+    return ~this._debuggers.indexOf(namespace);
+  }
+
+  /**
+   * Get Debugger
+   * Gets all debugger instances.
+   */
+  private getDebuggers(): IMap<ITimbrDebug> {
+    return this._debuggers;
   }
 
   /**
@@ -647,9 +655,9 @@ export class Timbr extends EventEmitter {
    * Debugger
    * : Creates a new grouped debugger.
    *
-   * @param group enables debugging by active group.
+   * @param namespace enables debugging by active group.
    */
-  debugger(group: string): ITimbrDebugger {
+  debugger(namespace: string): ITimbrDebug {
 
     // If no debuggers yet add unless explicitly disabled.
     // if ((!this._debuggers.length && enabled !== false) || enabled === true)
@@ -658,35 +666,95 @@ export class Timbr extends EventEmitter {
     // if (enabled === false)
     //   this.removeDebugger(group);
 
-    if (this.existsDebugger(group))
-      this.removeDebugger(group);
-    else
-      this.addDebugger(group);
+    // if (this.getDebugger(namespace))
+    //   this.destroyDebugger(namespace);
+    // else
+    //   this.addDebugger(namespace);
 
-    return {
-      log: (...args: any[]) => {
-        if (!~this._debuggers.indexOf(group))
-          return;
-        this.logger(`debug:${group}`, ...args);
-      },
-      write: (...args: any[]) => {
-        if (!~this._debuggers.indexOf(group))
-          return;
-        this.write(...args);
-      },
-      exit: this.exit
-      // enable: this.addDebugger.bind(this, group),
-      // disable: this.removeDebugger.bind(this, group)
+    // return {
+    //   log: (...args: any[]) => {
+    //     if (!~this._debuggers.indexOf(namespace))
+    //       return;
+    //     this.logger(`debug:${namespace}`, ...args);
+    //   },
+    //   write: (...args: any[]) => {
+    //     if (!~this._debuggers.indexOf(namespace))
+    //       return;
+    //     this.write(...args);
+    //   },
+    //   exit: this.exit
+    //   // enable: this.addDebugger.bind(this, group),
+    //   // disable: this.removeDebugger.bind(this, group)
+    // };
+
+    const self = this;
+    let previous;
+
+    const debug: any = function (...args: any[]) {
+
+      const current = +new Date();
+      const elapsed = current - (previous || current);
+
+      debug.previous = previous;
+      debug.current = current;
+      debug.elasped = elapsed;
+      previous = current;
+
+      const result = self.logger('debug:resolve', ...args);
+
     };
+
+    debug.namespace = namespace;
+    debug.enabled = true;
+    debug.colorize = true;
+    debug.styles = [];
+    debug.destroy = self.debuggers.destroy.bind(self, namespace);
+
+    return debug;
 
   }
 
-  /**
-   * Debuggers
-   * : Returns list of debuggers.
-   */
-  debuggers() {
-    return this._debuggers;
+  get debuggers() {
+
+    function toNamespace(instance: string | ITimbrDebug): string {
+      if (isString(instance))
+        return instance as string;
+      return (instance as ITimbrDebug).namespace;
+    }
+
+    const methods = {
+
+      /**
+       * Create
+       * Creates a debugger.
+       *
+       * @param namespace the namespace of the debugger to be created.
+       */
+      create: (namespace: string) => {
+        const instance = this.debugger(namespace);
+        this._debuggers[namespace] = instance;
+      },
+
+      enable: (namespace: string | ITimbrDebug) => {
+        const ns = toNamespace(namespace);
+        if (!~this._activeDebuggers.indexOf(ns))
+          this._activeDebuggers.push(ns);
+      },
+
+      disable: (namespace: string | ITimbrDebug) => {
+        const ns = toNamespace(namespace);
+        this._activeDebuggers.splice(this._activeDebuggers.indexOf(ns), 1);
+      },
+
+      destroy: (namespace: string | ITimbrDebug) => {
+        const ns = toNamespace(namespace);
+        delete this._debuggers[ns];
+      }
+
+    };
+
+    return methods;
+
   }
 
   /**
@@ -773,19 +841,6 @@ export class Timbr extends EventEmitter {
 
 }
 
-function intersect<T, U>(first: T, second: U): T & U {
-  let result = <T & U>{};
-  for (let id in first) {
-    (<any>result)[id] = (<any>first)[id];
-  }
-  for (let id in second) {
-    if (!result.hasOwnProperty(id)) {
-      (<any>result)[id] = (<any>second)[id];
-    }
-  }
-  return result;
-}
-
 /**
  * Create
  * Creates a new instance of Timbr.
@@ -821,6 +876,17 @@ export function init(options?: ITimbrOptions): TimbrUnion<LogLevelKeys> {
   return create<LogLevelKeys>(options, LOG_LEVELS);
 }
 
+export interface ITimbrDebug {
+  (...args: any[]);
+  namespace: string;
+  colorize: boolean;
+  styles: AnsiStyles | AnsiStyles[];
+  previous: number;
+  current: number;
+  elapsed: number;
+  enabled: boolean;
+  destroy(): void;
+}
 
 
 
