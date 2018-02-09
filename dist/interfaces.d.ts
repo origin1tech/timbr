@@ -1,22 +1,27 @@
 /// <reference types="node" />
 import { IAnsiStyles } from 'colurs';
 import { Timbr } from './timbr';
-export declare type EventCallback = (event: ITimbrEventData) => void;
+export declare type EventCallback = (message?: string, event?: ITimbrEventData) => void;
 export declare type AnsiStyles = keyof IAnsiStyles;
 export declare type OptionKeys = keyof ITimbrOptions;
 export declare type TimbrSymbols = keyof ITimbrSymbols;
 export declare type TimestampCallback = () => string;
-export declare type TimestampFormat = 'time' | 'datetime' | TimestampCallback;
+export declare type TimestampFormat = false | 'epoch' | 'time' | 'datetime' | 'iso' | TimestampCallback;
 export declare type TimbrMethod<L extends string> = (...args: any[]) => TimbrUnion<L>;
 export declare type TimbrUnion<L extends string> = ITimbr<L> & Record<L, TimbrMethod<L>>;
+export declare type DebuggerOrNamespace = string | ITimbrDebug | (string | ITimbrDebug)[];
+export declare type BeforeWrite = (event?: ITimbrEventData) => string;
 export interface IMap<T> {
     [key: string]: T;
 }
-export interface ITimbrLevel {
-    label?: string;
-    styles?: AnsiStyles | AnsiStyles[];
+export interface ITimbrLevelBase {
+    styles?: string | string[];
     symbol?: string | TimbrSymbols;
-    symbolPos?: 'before' | 'after';
+    symbolPos?: string;
+    symbolStyles?: string | string[];
+}
+export interface ITimbrLevel extends ITimbrLevelBase {
+    label?: string;
 }
 export interface ITimbrLevels extends IMap<string | string[] | ITimbrLevel> {
 }
@@ -24,14 +29,21 @@ export interface ITimbr<L extends string> extends Timbr {
     (...args: any[]): TimbrUnion<L>;
 }
 export interface ITimbrEventData {
-    timestamp: string;
     type: string;
+    subTypes: string[];
+    index: number;
+    activeIndex: number;
+    level: ITimbrLevel | ITimbrDebug;
+    timestamp: string | number | Date;
     message: string;
-    formatted: string;
     meta: IMap<any>;
     args: any[];
     error?: Error;
-    stackTrace?: IStacktraceFrame[];
+    stack?: IStacktraceResult;
+    compiled?: any[];
+}
+export interface ITimbrParsedEvent extends ITimbrEventData {
+    fn?: EventCallback;
 }
 export interface IStacktraceFrame {
     method: string;
@@ -41,8 +53,8 @@ export interface IStacktraceFrame {
     column: number;
 }
 export interface IStacktraceResult {
-    frames: IStacktraceFrame[];
-    stack: string[];
+    stackFrames: IStacktraceFrame[];
+    stackTrace: string[];
     miniStack: string;
 }
 export interface ITimbrSymbols {
@@ -53,36 +65,38 @@ export interface ITimbrSymbols {
     debug: string;
     ok: string;
 }
-export interface ITimestamp {
-    format: TimestampFormat;
-    styles?: AnsiStyles | AnsiStyles[];
+export interface ITimbrDebugOptions extends ITimbrLevelBase {
 }
-export interface ITimestampResult extends ITimestamp {
-    date: Date;
-    timestamp: string;
+export interface ITimbrDebug extends ITimbrDebugOptions {
+    (...args: any[]): any;
+    namespace: string;
+    previous: number;
+    current: number;
+    elapsed: number;
+    enabled(): boolean;
+    enable(): void;
+    disable(): void;
+    destroy(): void;
 }
 export interface ITimbrOptions {
     stream?: NodeJS.WritableStream;
-    timestamp?: TimestampFormat | ITimestamp;
     level?: string | number;
-    padLevels?: boolean;
-    labelLevels?: boolean;
     colorize?: boolean;
+    labelLevels?: boolean;
+    padLevels?: boolean;
+    timestamp?: TimestampFormat;
+    timestampStyles?: AnsiStyles | AnsiStyles[];
+    timestampLocale?: string;
+    timestampTimezone?: string;
     errorCapture?: boolean;
+    errorLevel?: string;
     errorExit?: boolean;
     errorConvert?: boolean;
-    errorLevel?: string;
     errorConstruct?: boolean;
     stackTrace?: boolean;
     stackDepth?: number;
-    prettyStack?: boolean;
     miniStack?: boolean;
-    debugLevel?: string;
-    debugAuto?: boolean;
+    debugLevel?: string | false;
     debugOnly?: boolean;
-}
-export interface ITimbrDebugger {
-    log(...args: any[]): void;
-    write(...args: any[]): void;
-    exit(code: number): void;
+    beforeWrite?: BeforeWrite;
 }

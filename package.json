@@ -38,6 +38,7 @@
     "@types/node": "^8.0.28",
     "chai": "^4.0.2",
     "mocha": "^3.4.2",
+    "mute-stream": "0.0.7",
     "stiks": "^1.0.6",
     "ts-node": "^3.3.0",
     "tslint": "^5.5.0",
@@ -45,7 +46,7 @@
     "typescript": "^2.5.2"
   },
   "dependencies": {
-    "chek": "^1.0.27",
+    "chek": "^1.1.6",
     "colurs": "^1.0.12"
   }
 }

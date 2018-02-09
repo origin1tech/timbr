@@ -5,73 +5,86 @@ const expect = chai.expect;
 const should = chai.should;
 const assert = chai.assert;
 
-import { ITimbrEventData, timbr as log, create } from './';
+import { ITimbrEventData, init, create } from './';
+import * as MuteStream from 'mute-stream';
 
-// const logUser = log.create(null, 'emergency', 'alert', 'critical', 'notify');
-
+// Just create custom levels no config needed for testing.
 const levels = {
-  emergency: [],
-  alert: [],
-  critical: [],
-  notify: []
+  emergency: null,
+  alert: null,
+  critical: null,
+  notify: null
 };
 
+// Mute the output stream so we don't clutter test output.
+const ms = new MuteStream();
+ms.pipe(process.stderr);
+ms.mute();
+
+const log = init({
+  stream: ms
+});
 const logUser = create(null, levels);
 
 describe('Timbr', () => {
 
   it('should test formatting of "my name is %s."', () => {
-    const result = log.logger('info:resolve', 'my name is %s.', 'joe') as ITimbrEventData;
+    const result = log.parse('info', 'my name is %s.', 'joe') as ITimbrEventData;
     assert.equal(result.type, 'info');
     assert.equal(result.message, 'my name is joe.');
   });
 
   it('should test user defined logger formatting of "my name is %s."', () => {
-    const result = logUser.logger('critical:resolve', 'my name is %s.', 'joe') as ITimbrEventData;
+    const result = logUser.parse('critical', 'my name is %s.', 'joe') as ITimbrEventData;
     assert.equal(result.type, 'critical');
     assert.equal(result.message, 'my name is joe.');
   });
 
-  it('should emit result on logged message', (done) => {
-    const handler = (result) => {
-      log.removeListener('log:info', handler);
-      assert.equal(result.message, 'there was violence on "many sides".');
+  it('should log then callback.', (done) => {
+    log.info('log then callback.', (message, event) => {
+      assert.equal(message, 'log then callback.');
       done();
-    };
-    log.on('log:info', handler);
-    log.logger('info:resolve', 'there was violence on "many sides".');
+    });
+  });
+
+  it('should emit result on logged message', (done) => {
+    function handler(message, event) {
+      assert.equal(message, 'there was violence on "many sides".');
+      log.removeListener('log:info', handler);
+      done();
+    }
+    log.addListener('log:info', handler);
+    log.info('there was violence on "many sides".');
   });
 
   it('should log with metadata.', () => {
     const ts = new Date();
     const meta = { timestamp: ts, server: 'Deadpool' };
-    const result = log.logger('info:resolve', 'the user %s could not be found.', 'jabernathy', meta) as ITimbrEventData;
+    const result = log.parse('info', 'the user %s could not be found.', 'jabernathy', meta) as ITimbrEventData;
     assert.deepEqual(result.meta, meta);
-  });
-
-  it('should log then callback.', (done) => {
-    const result = log.logger('info:resolve', 'log then callback.', (result) => {
-      assert.equal(result.message, 'log then callback.');
-      done();
-    }) as ITimbrEventData;
   });
 
   it('should handle logging an error.', () => {
     const err = new Error('just some error.');
-    const result = log.logger('info:resolve', err) as ITimbrEventData;
+    const result = log.parse('info', err) as ITimbrEventData;
     assert.deepEqual(result.error, err);
   });
 
   it('should test write method.', () => {
-    const result = log.logger('write:resolve', 'some write message.') as ITimbrEventData;
+    const result = log.parse('write', 'some write message.') as ITimbrEventData;
     assert.equal(result.message, 'some write message.');
   });
 
   it('should handle converting message to an error.', () => {
-    log.set('errorConstruct', true);
-    const result = log.logger('error:resolve', 'converted to error.') as ITimbrEventData;
-    log.set('errorConstruct', false);
+    log.setOption('errorConstruct', true);
+    const result = log.parse('error', 'converted to error.') as ITimbrEventData;
+    log.setOption('errorConstruct', false);
     assert.instanceOf(result.error, Error);
+  });
+
+  it('should get warn symbol', () => {
+    const sym = log.symbol('warn');
+    assert.equal(sym, '⚠');
   });
 
 });

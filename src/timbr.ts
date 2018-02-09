@@ -3,8 +3,8 @@
 import { EventEmitter } from 'events';
 import { relative, parse } from 'path';
 import { Colurs, IColurs } from 'colurs';
-import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone, isWindows, isEmpty } from 'chek';
-import { IStacktraceFrame, IStacktraceResult, ITimbrEventData, ITimbrOptions, EventCallback, IMap, OptionKeys, AnsiStyles, ITimbrLevels, TimbrUnion, ITimbrDebugger, ITimbrLevel, ITimbr, TimestampCallback, ITimestamp, TimestampFormat, ITimestampResult } from './interfaces';
+import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone, isWindows, isEmpty, split } from 'chek';
+import { IStacktraceFrame, IStacktraceResult, ITimbrEventData, ITimbrOptions, EventCallback, IMap, OptionKeys, AnsiStyles, ITimbrLevels, TimbrUnion, ITimbrLevel, ITimbr, TimestampCallback, ITimbrParsedEvent, TimestampFormat, ITimbrDebug, DebuggerOrNamespace, ITimbrDebugOptions } from './interfaces';
 import { format, inspect } from 'util';
 
 const IS_SYMBOLS_SUPPORTED = !isWindows() || process.env.VSCODE_PID || process.env.CI;
@@ -26,30 +26,37 @@ export const LOG_LEVELS = {
   warn: 'yellow',
   info: 'green',
   trace: 'cyan',
+  verbose: 'magenta',
   debug: 'blue'
+};
+
+const DEBUG_DEFAULTS: ITimbrLevel = {
+  styles: 'blue'
 };
 
 export type LogLevelKeys = keyof typeof LOG_LEVELS;
 
 const DEFAULTS: ITimbrOptions = {
-  stream: undefined,      // the stream to output log messages to.
+  stream: process.stderr, // the stream to output log messages to.
   level: 'info',          // the level the logger is current set at.
+  colorize: true,         // whether or not to colorize output.
   labelLevels: true,      // when true level label prefixes log message.
   padLevels: true,        // when true levels are padded on the left.
-  colorize: true,         // whether or not to colorize output.
-  errorExit: false,       // exit on error level.
-  errorConvert: false,    // if first arg is error instance convert to error level.
-  errorCapture: false,    // whether or not to capture uncaught errors.
+  timestamp: 'time',      // timestamp format date, time or false.
+  timestampStyles: null,  // Ansi styles for colorizing.
+  timestampLocale: 'en-US', // The locale for timestamps.
+  timestampTimezone: 'UTC', // IANA timezone string ex: America/Los_Angeles
   errorLevel: 'error',    // level to use for errors.
-  errorConstruct: false,  // when true if error level convert msg to instanceof Error.
+  errorExit: false,       // exit on error level.
+  errorConvert: false,    // when true converts to error level when Error is detected.
+  errorCapture: false,    // whether or not to capture uncaught errors.
+  errorConstruct: false,  // convert string msg to instanceof Error for error level.
   stackTrace: true,       // whether or not to display full stack trace for errors.
   stackDepth: 0,          // the depth of stack traces results 0 for full stack.
-  prettyStack: false,     // whether or not to prettify the stack trace.
   miniStack: false,       // mini stack trace appended to message.
-  timestamp: 'time',      // timestamp format date, time or false.
-  debugLevel: 'debug',    // level to use for debug.
-  debugAuto: true,        // when true switch to debug level on Node debug detected.
-  debugOnly: false        // when debugging only show debug level messages.
+  debugLevel: 'debug',    // set a level as the default debugger.
+  debugOnly: false,       // when debugging, only show debug level messages.
+  beforeWrite: null       // Called before writing to stream for customizing output.
 };
 
 export class Timbr extends EventEmitter {
@@ -59,7 +66,6 @@ export class Timbr extends EventEmitter {
 
   private _levels: ITimbrLevels;
   private _levelKeys: string[];
-  private _symbols = SYMBOLS;
 
   stream: NodeJS.WritableStream;
   options: ITimbrOptions;
@@ -95,17 +101,30 @@ export class Timbr extends EventEmitter {
 
     this.stream = options.stream || this.stream || process.stdout;
 
-    if ((isDebug() || process.env.DEBUG) && options.debugAuto) {
-      const debugLevel = options.debugLevel;
-      if (~this._levelKeys.indexOf(<string>debugLevel))
-        options.level = <string>debugLevel;
-      if (process.env.DEBUG)
-        this.addDebugger(process.env.DEBUG);
+    if (isDebug()) {
+
+      const envDebug = process.env.DEBUG;
+      let active: any = envDebug ? split(envDebug.trim().replace(/  +/g, ''), [',', ' ']) : [];
+
+      if (!active.length)
+        this._activeDebuggers.push('default');
+      else
+        this._activeDebuggers = active;
+
+      if (process.env.DEBUG_ONLY)
+        this.options.debugOnly = true;
+
     }
 
     // Init methods.
     this._levelKeys.forEach((l, i) => {
-      this[l] = this.logger.bind(this, l);
+      if (l === this.options.debugLevel) {
+        const _debugr = this.debugger('default', this._levels[l] as ITimbrDebugOptions);
+        this[l] = _debugr.bind(this);
+      }
+      else {
+        this[l] = this.logger.bind(this, l);
+      }
     });
 
   }
@@ -123,25 +142,32 @@ export class Timbr extends EventEmitter {
           label: k,
           styles: toArray(level, []),
           symbol: null,
-          symbolPos: 'after'
+          symbolPos: 'after',
+          symbolStyles: []
         };
         this._levels[k] = level;
       }
       else {
         const lvl = this._levels[k] as ITimbrLevel;
-        this._levels[k] = extend({}, lvl);
-        lvl.label = lvl.label || k;
+        lvl.label = lvl.label !== null ? lvl.label || k : null;
         lvl.styles = toArray(lvl.styles, []);
+        lvl.symbol = lvl.symbol || null;
+        lvl.symbolPos = lvl.symbolPos || 'after';
+        lvl.symbolStyles = lvl.symbolStyles;
+        // Check if known symbol.
+        if (SYMBOLS[lvl.symbol])
+          lvl.symbol = SYMBOLS[lvl.symbol];
+        if ((lvl.symbolStyles !== null || !lvl.symbolStyles.length) && lvl.styles)
+          lvl.symbolStyles = lvl.styles;
+        this._levels[k] = lvl;
       }
     }
 
     const levelKeys = this._levelKeys;
-
     let level: any = this.options.level;
-    const debugLevel = this.options.debugLevel;
     const errorLevel = this.options.errorLevel;
-    const exitLevel = this.options.errorExit;
 
+    // Ensure a default log level.
     let tmpLevel = level;
     if (isNumber(level))
       tmpLevel = levelKeys[level] || 'info';
@@ -151,22 +177,18 @@ export class Timbr extends EventEmitter {
       tmpLevel = last(levelKeys);
     level = this.options.level = tmpLevel;
 
-    // ensure debug level.
-    if (!~levelKeys.indexOf(debugLevel))
-      this.options.debugLevel = last<string>(this._levelKeys);
-
     // ensure error level
     if (!~levelKeys.indexOf(errorLevel))
       this.options.errorLevel = first<string>(this._levelKeys);
 
-  }
+    // Ensure default log level config.
+    if (!this._levels['log'])
+      this._levels['log'] = {
+        label: 'log',
+        styles: null,
+        symbol: null
+      };
 
-  /**
-   * Is Debug
-   * Returns true if level matches debug level.
-   */
-  private isDebugging() {
-    return this.options.level === this.options.debugLevel;
   }
 
   /**
@@ -194,19 +216,6 @@ export class Timbr extends EventEmitter {
   }
 
   /**
-   * Colorize If
-   * If colors are enabled apply ansi styles to value.
-   *
-   * @param val the value to be colorized.
-   * @param styles the styles to be applied.
-   */
-  private colorizeIf(val: any, styles?: AnsiStyles | AnsiStyles[]) {
-    if (!this.options.colorize)
-      return val;
-    return this.colorize(val, styles);
-  }
-
-  /**
    * Parse Stack
    * Simple stack parser to limit and stylize stacktraces.
    *
@@ -216,8 +225,8 @@ export class Timbr extends EventEmitter {
    */
   private parseStack(stack: any, prune?: number, depth?: number): IStacktraceResult {
 
-    prune = prune || 0;
-    depth = depth || this.options.stackDepth;
+    prune = isEmpty(prune) ? 0 : prune;
+    depth = isEmpty(depth) ? this.options.stackDepth : depth;
 
     if (!stack)
       return null;
@@ -226,8 +235,12 @@ export class Timbr extends EventEmitter {
     const traced = [];
     let miniStack;
 
-    stack.split(EOL)
-      .slice(prune)
+    stack = stack.split(EOL);
+    const first = stack.shift();
+    stack = stack.slice(prune);
+    stack.unshift(first);
+
+    stack
       .forEach((s, i) => {
 
         if (i >= depth && depth !== 0)
@@ -235,13 +248,14 @@ export class Timbr extends EventEmitter {
 
         let relativeFile, filename, column, line, method;
 
+        const orig = s;
         method = s;
         method = s.replace(/^\s*at\s?/, '').split(' ')[0];
         s = s.replace(/^\s+/, '').replace(/^.+\(/, '').replace(/\)$/, '');
         s = s.split(':');
         filename = s[0];
-        column = s[1];
-        line = s[2];
+        line = s[1];
+        column = s[2];
 
         const isModule = /^module/.test(filename);
         relativeFile = filename;
@@ -261,21 +275,19 @@ export class Timbr extends EventEmitter {
           column: toInteger(column, 0)
         };
 
-        // const trace = `    at ${this.colorizeIf(method || 'uknown', 'magenta')} (${this.colorizeIf(relativeFile, 'green')}:${this.colorizeIf(line, 'yellow')}:${this.colorizeIf(column, 'yellow')})`;
+        // const trace = `    at ${method} (${relativeFile}:${line}:${column})`;
 
-        const trace = this.colorizeIf(`    at ${method} (${relativeFile}:${line}:${column})`, 'gray');
-
-        if (i === 0)
-          miniStack = this.colorizeIf(`(${parsedRelative.base}:${line}:${column})`, 'gray');
+        if (i === 1)
+          miniStack = `(${parsedRelative.base}:${line}:${column})`;
 
         frames.push(frame);
-        traced.push(trace);
+        traced.push(orig);
 
       });
 
     return {
-      frames: frames,
-      stack: traced,
+      stackFrames: frames,
+      stackTrace: traced,
       miniStack: miniStack
     };
 
@@ -287,37 +299,40 @@ export class Timbr extends EventEmitter {
    *
    * @param format the format to return.
    */
-  private getTimestamp(format?: TimestampFormat | ITimestamp) {
+  private getTimestamp(format?: TimestampFormat) {
 
     format = format || this.options.timestamp;
 
-    let config: ITimestampResult = {
-      format: 'time',
-      styles: 'gray',
-      date: new Date(),
-      timestamp: null
-    };
+    const date = new Date();
+    let dt: any = date.toLocaleString(this.options.timestampLocale, { timeZone: this.options.timestampTimezone, hour12: false });
 
-    if (isPlainObject(format)) {
-      extend(config, format);
-    }
-    else {
-      config.format = format as TimestampFormat;
-    }
+    let result: any;
 
-    if (isFunction(config.format)) {
-      config.timestamp = (config.format as TimestampCallback)();
-    }
-    else {
-      const ts = config.date.toISOString();
-      const split = ts.replace('Z', '').split('T');
-      if (config.format === 'time')
-        config.timestamp = split[1];
-      else
-        config.timestamp = `${split[0]} ${split[1]}`;
-    }
+    dt = dt.replace(' ', '').split(',');
+    let localeDate: any = dt[0];
+    const localeTime = dt[1];
 
-    return config;
+    localeDate = localeDate
+      .split('/')
+      .map(v => v.length < 2 ? '0' + v : v)
+      .join('-');
+
+    if (isFunction(format))
+      result = (format as Function)();
+
+    else if (format === 'epoch')
+      result = date.getTime() + '';
+
+    else if (format === 'iso')
+      result = date.toISOString();
+
+    else if (format === 'time')
+      result = localeTime;
+
+    else if (format === 'datetime')
+      result = localeDate + ' ' + localeTime;
+
+    return result;
 
   }
 
@@ -329,14 +344,13 @@ export class Timbr extends EventEmitter {
    */
   private uncaughtException(err: Error) {
     let errorLevel = this.options.errorLevel;
-    if (!this.options.errorCapture || !this.exists(errorLevel))
+    const exists = ~this.getIndex(errorLevel);
+    if (!this.options.errorCapture || !exists)
       throw err;
-    const origLevel = errorLevel;
-    errorLevel += ':exception';
-    this.logger(errorLevel, err, () => {
-      this.toggleExceptionHandler(false);
-      process.exit(1); // always exit on uncaught errors.
-    });
+    // Disable to prevent loops will exit after catching.
+    this.toggleExceptionHandler(false);
+    this.logger(errorLevel, err);
+    process.exit(1);
   }
 
   /**
@@ -345,51 +359,11 @@ export class Timbr extends EventEmitter {
    *
    * @param capture whether to capture uncaught exceptions or not.
    */
-  private toggleExceptionHandler(capture?: boolean) {
+  private toggleExceptionHandler(capture: boolean) {
     if (!capture)
       process.removeListener('uncaughtException', this.uncaughtException.bind(this));
     else
       process.on('uncaughtException', this.uncaughtException.bind(this));
-  }
-
-  /**
-   * Add Debugger
-   * : Adds a debugger namespace if does not already exist.
-   *
-   * @param namespace the debugger namespace to add.
-   * @param instance the debugger instance.
-   */
-  private addDebugger(namespace: string, instance: ITimbrDebug) {
-    this._debuggers[namespace] = instance;
-  }
-
-  /**
-   * Remove Debugger
-   * : Removes the specified namespace from debuggers.
-   *
-   * @param namespace the debugger namespace to remove.
-   */
-  private destroyDebugger(namespace: string) {
-    this._activeDebuggers = this._activeDebuggers.filter(a => a !== namespace);
-    delete this._debuggers[namespace];
-  }
-
-  /**
-   * Get Debugger
-   * Gets a debugger.
-   *
-   * @param namespace the namespace to get debugger by.
-   */
-  private getDebugger(namespace: string) {
-    return ~this._debuggers.indexOf(namespace);
-  }
-
-  /**
-   * Get Debugger
-   * Gets all debugger instances.
-   */
-  private getDebuggers(): IMap<ITimbrDebug> {
-    return this._debuggers;
   }
 
   /**
@@ -406,217 +380,38 @@ export class Timbr extends EventEmitter {
 
     let max = 0;
     let len = type.length;
-    let i = this._levelKeys.length;
+    let i;
     let padding = '';
     offset = isString(offset) ? (offset as string).length : offset;
     offset = offset || 0;
 
-    function pad(l) {
-      let s = '';
-      while (l--)
-        s += ' ';
-      return s;
+    const debugLevels = (this._activeDebuggers || []).map(l => {
+      if (l === 'default')
+        return 'debug';
+      return `debug:${l}`;
+    });
+
+    let levels = [];
+
+    for (const k in this._levels) {
+      const level = this._levels[k] as ITimbrLevel;
+      if (level.label !== null)
+        levels.push(level.label);
     }
 
-    const debugLevels = (this._debuggers || []).map(l => `debug-${l}`);
-    const levels = this._levelKeys.concat(debugLevels);
+    levels = levels.concat(debugLevels);
+
+    i = levels.length;
 
     while (i--) {
-      //  const diff = this._levelKeys[i].length - len;
       const diff = levels[i].length - len;
-      if (diff > 0)
-        padding = pad(diff + <number>offset);
+      const t = levels[i];
+      if (diff > 0 && (padding.length < diff + <number>offset))
+        padding = ' '.repeat(diff + <number>offset);
     }
 
     return padding;
 
-  }
-
-  /**
-   * Logger
-   * : Common logger method.
-   *
-   * @param type the type of log message to log.
-   * @param args the arguments to be logged.
-   */
-  logger(type: string, ...args: any[]) {
-
-    const clone = args.slice(0);
-    const origType = type;
-    const splitType = type ? type.split(':') : null;
-    type = splitType[0];
-
-    // Flags used internally.
-    const isResolve = contains(splitType, 'resolve');
-    const isException = contains(splitType, 'exception');
-    const debugGroup = type === 'debug' && splitType[1];
-    const knownType = contains(this._levelKeys, type);
-    let emitType = !debugGroup ? splitType[0] : origType;
-
-    let stackTrace: IStacktraceResult;
-    let err, errMsg, meta, metaFormatted, tsFmt, tsDate, msg, normalized, rawMsg, errType;
-    let event: ITimbrEventData;
-    let fn: EventCallback = noop;
-
-    const result = [];
-    const suffix = [];
-    let pruneTrace = 1;
-
-    // Converts to error if first arg is instance of Error.
-    if ((clone[0] instanceof Error) && this.options.errorConvert)
-      type = this.options.errorLevel;
-
-    if (type === this.options.errorLevel && this.options.errorConstruct && isString(clone[0])) {
-      clone[0] = new Error(clone[0]);
-      pruneTrace = 2;
-    }
-
-    const level = (knownType ? this._levels[type] : null) as ITimbrLevel;
-    const idx = this.getIndex(type);
-    const activeIdx = this.getIndex(this.options.level);
-
-    // If debugOnly and we are debugging ensure is debug level.
-    if (this.options.debugOnly &&
-      this.isDebugging() &&
-      type !== this.options.level)
-      return this;
-
-    // Check if is loggable level.
-    if (!isResolve && (idx > activeIdx))
-      return this;
-
-    if (isFunction(last(clone))) {
-      fn = clone.pop();
-      args.pop();
-    }
-
-    meta = isPlainObject(last(clone)) ? clone.pop() : null;
-    err = isError(first(clone)) ? clone.shift() : null;
-    stackTrace = err ?
-      this.parseStack(err.stack, pruneTrace) :
-      this.parseStack((new Error('get stack')).stack, 2);
-
-    // Add optional timestamp.
-    if (this.options.timestamp) {
-      const ts = this.getTimestamp();
-      tsFmt = ts.timestamp;
-      tsDate = ts.date;
-      result.push(this.colorizeIf(`[${tsFmt}]`, ts.styles));
-    }
-
-    // Add error type if not generic 'Error'.
-    errType = err && err.name !== 'Error' ? `:${err.name}` : '';
-
-    // Add log label type.
-    if (knownType && this.options.labelLevels) {
-
-      let styledType = this.colorizeIf(type, level.styles);
-      let styledDebugType = 'debug-' + debugGroup;
-      let padType = type;
-
-      if (debugGroup) {
-        styledDebugType = this.colorizeIf(styledDebugType, level.styles);
-        styledType += styledDebugType;
-      }
-
-      const padding = this.pad(type);
-      styledType += this.colorizeIf(errType, level.styles);
-      result.push(padding + styledType + ':');
-
-    }
-
-    // If error we need to build the message.
-    if (err) {
-      errMsg = (err.message || 'Uknown Error');
-      clone.unshift(errMsg);
-    }
-
-    rawMsg = clone[0] || null;
-
-    // Format the message.
-    if (clone.length) {
-      if (clone.length > 1) {
-        if (/(%s|%d|%j|%%)/g.test(clone[0])) {
-          rawMsg = format(clone[0], clone.slice(1));
-          result.push(rawMsg);
-        }
-        else {
-          rawMsg = clone.join(' ');
-          result.push(rawMsg);
-        }
-      }
-      else {
-        result.push(clone[0]);
-      }
-    }
-
-    // Add formatted metadata to result.
-    if (meta) {
-      metaFormatted = format(inspect(meta, null, null, this.options.colorize));
-      result.push(metaFormatted);
-    }
-
-    // Add ministack.
-    if (this.options.miniStack && stackTrace)
-      result.push(this.colorizeIf(stackTrace.miniStack, 'gray'));
-
-    // Add stack trace if error.
-    if (err && stackTrace) {
-      if (this.options.prettyStack)
-        suffix.push(format(inspect(stackTrace.frames, null, null, this.options.colorize)));
-      else
-        suffix.push(stackTrace.stack.join(EOL));
-    }
-
-    msg = result.join(' ');
-    msg = (suffix.length ? msg + EOL + suffix.join(EOL) : msg) + EOL;
-
-    // Output to stream if not resolving event result.
-    if (!isResolve)
-      this.stream.write(msg);
-
-    event = {
-      timestamp: tsDate,
-      type: type,
-      message: rawMsg + (metaFormatted || ''),
-      formatted: msg,
-      meta: meta,
-      args: args,
-      error: err,
-      stackTrace: stackTrace.frames,
-    };
-
-    // Emit logged and logged by type listeners.
-    this.emit('log', event);
-    this.emit(`log:${emitType}`, event);
-
-    // Call local callback.
-    fn(event);
-
-    // Toggle the exception for.
-    if (isException)
-      this.toggleExceptionHandler(false);
-
-    // If no ouput return object.
-    if (isResolve)
-      return event;
-
-    // Check if should exit on error.
-    if (type === this.options.errorLevel && this.options.errorExit)
-      process.exit();
-
-    return this;
-
-  }
-
-  /**
-   * Exists
-   * : Checks if level exists in levels.
-   *
-   * @param level the key to check.
-   */
-  exists(level: any) {
-    return !!~this.getIndex(level);
   }
 
   /**
@@ -653,44 +448,50 @@ export class Timbr extends EventEmitter {
 
   /**
    * Debugger
-   * : Creates a new grouped debugger.
+   * Creates a new debugger instance.
    *
-   * @param namespace enables debugging by active group.
+   * @param options debugger options.
    */
-  debugger(namespace: string): ITimbrDebug {
+  debugger(options: ITimbrDebugOptions): ITimbrDebug;
 
-    // If no debuggers yet add unless explicitly disabled.
-    // if ((!this._debuggers.length && enabled !== false) || enabled === true)
-    //   this.addDebugger(group);
+  /**
+   * Debugger
+   * Creates a new debugger instance.
+   *
+   * @param namespace creates a debugger by namespace.
+   * @param options debugger options.
+   */
+  debugger(namespace?: string | ITimbrDebugOptions, options?: ITimbrDebugOptions): ITimbrDebug;
 
-    // if (enabled === false)
-    //   this.removeDebugger(group);
-
-    // if (this.getDebugger(namespace))
-    //   this.destroyDebugger(namespace);
-    // else
-    //   this.addDebugger(namespace);
-
-    // return {
-    //   log: (...args: any[]) => {
-    //     if (!~this._debuggers.indexOf(namespace))
-    //       return;
-    //     this.logger(`debug:${namespace}`, ...args);
-    //   },
-    //   write: (...args: any[]) => {
-    //     if (!~this._debuggers.indexOf(namespace))
-    //       return;
-    //     this.write(...args);
-    //   },
-    //   exit: this.exit
-    //   // enable: this.addDebugger.bind(this, group),
-    //   // disable: this.removeDebugger.bind(this, group)
-    // };
+  /**
+   * Debugger
+   * Creates a new debugger instance.
+   *
+   * @param namespace creates a debugger by namespace.
+   * @param options debugger options.
+   */
+  debugger(namespace?: string | ITimbrDebugOptions, options?: ITimbrDebugOptions): ITimbrDebug {
 
     const self = this;
     let previous;
 
+    if (isPlainObject(namespace)) {
+      options = namespace as ITimbrDebugOptions;
+      namespace = undefined;
+    }
+
+    namespace = namespace || 'default';
+
+    // Check if debugger exists.
+    if (this._debuggers[namespace as string])
+      return this._debuggers[namespace as string];
+
+    options = extend({}, DEBUG_DEFAULTS, options);
+
     const debug: any = function (...args: any[]) {
+
+      if (!isDebug() || !~self._activeDebuggers.indexOf(namespace as string))
+        return self;
 
       const current = +new Date();
       const elapsed = current - (previous || current);
@@ -700,15 +501,33 @@ export class Timbr extends EventEmitter {
       debug.elasped = elapsed;
       previous = current;
 
-      const result = self.logger('debug:resolve', ...args);
+      const event = self.parse(`debug:${namespace}`, ...args);
+
+      let msg = event.compiled.join(' ');
+      self.options.stream.write(msg + self.colorize(` (${elapsed}ms)`, debug.styles) + EOL);
+
+      self.emit('debug', event.message, event);
+      self.emit(`${event.type}`, event.message, event);
+
+      event.fn(event.message, event);
+
+      return self;
 
     };
 
     debug.namespace = namespace;
-    debug.enabled = true;
-    debug.colorize = true;
-    debug.styles = [];
+    debug.styles = options.styles;
+    debug.symbol = options.symbol || null;
+    debug.symbolPos = options.symbolPos || 'after';
+    debug.symbolStyles = options.symbolStyles !== null ? options.symbolStyles || debug.styles || [] : null;
+
+    debug.enabled = self.debuggers.enabled.bind(self, namespace);
+    debug.enable = self.debuggers.enable.bind(self, namespace);
+    debug.disable = self.debuggers.disable.bind(self, namespace);
     debug.destroy = self.debuggers.destroy.bind(self, namespace);
+
+    // Add to collection.
+    this._debuggers[namespace as string] = debug;
 
     return debug;
 
@@ -717,12 +536,30 @@ export class Timbr extends EventEmitter {
   get debuggers() {
 
     function toNamespace(instance: string | ITimbrDebug): string {
-      if (isString(instance))
-        return instance as string;
+      if (isString(instance)) {
+        return (instance as string).replace(/^debug:/, '') as string;
+      }
       return (instance as ITimbrDebug).namespace;
     }
 
     const methods = {
+
+      /**
+       * Get
+       * Gets a debugger.
+       */
+      get: (namespace: string) => {
+        const ns = toNamespace(namespace);
+        return this._debuggers[ns];
+      },
+
+      /**
+       * Get All
+       * Gets an object containing all debuggers.
+       */
+      getAll: () => {
+        return this._debuggers;
+      },
 
       /**
        * Create
@@ -730,30 +567,284 @@ export class Timbr extends EventEmitter {
        *
        * @param namespace the namespace of the debugger to be created.
        */
-      create: (namespace: string) => {
-        const instance = this.debugger(namespace);
-        this._debuggers[namespace] = instance;
+      create: (namespace: string, options?: ITimbrDebugOptions) => {
+        const ns = toNamespace(namespace);
+        const instance = this.debugger(ns, options);
+        this._debuggers[ns] = instance;
       },
 
-      enable: (namespace: string | ITimbrDebug) => {
-        const ns = toNamespace(namespace);
-        if (!~this._activeDebuggers.indexOf(ns))
-          this._activeDebuggers.push(ns);
+      /**
+       * Enabled
+       * Checks if namespace or instance is enabled.
+       *
+       * @param namespaceOrInstnace the ns or instance to check.
+       */
+      enabled: (namespaceOrInstance: string | ITimbrDebug) => {
+        const ns = toNamespace(namespaceOrInstance);
+        return !!~this._activeDebuggers.indexOf(ns);
       },
 
-      disable: (namespace: string | ITimbrDebug) => {
-        const ns = toNamespace(namespace);
-        this._activeDebuggers.splice(this._activeDebuggers.indexOf(ns), 1);
+      /**
+       * Enable
+       * Enables a namespace, instance or array of namespaces or instances.
+       *
+       * @param namespaceOrInstnace the ns or instance to enable.
+       */
+      enable: (namespaceOrInstance: DebuggerOrNamespace) => {
+        namespaceOrInstance = toArray<string | ITimbrDebug>(namespaceOrInstance);
+        namespaceOrInstance.forEach(ns => {
+          ns = toNamespace(ns) as string;
+          if (!~this._activeDebuggers.indexOf(ns))
+            this._activeDebuggers.push(ns);
+        });
       },
 
-      destroy: (namespace: string | ITimbrDebug) => {
-        const ns = toNamespace(namespace);
-        delete this._debuggers[ns];
+      /**
+       * Disable
+       * Disables a namespace, instance or array of namespaces or instances.
+       *
+       * @param namespaceOrInstnace the ns or instance to disable.
+       */
+      disable: (namespaceOrInstance: DebuggerOrNamespace) => {
+        namespaceOrInstance = toArray<string | ITimbrDebug>(namespaceOrInstance);
+        namespaceOrInstance.forEach(ns => {
+          ns = toNamespace(ns) as string;
+          this._activeDebuggers.splice(this._activeDebuggers.indexOf(ns), 1);
+        });
+      },
+
+      /**
+       * Destroy
+       * Destroys a namespace, instance or array of namespaces or instances.
+       *
+       * @param namespaceOrInstnace the ns or instance to destroy.
+       */
+      destroy: (namespaceOrInstance: DebuggerOrNamespace) => {
+        namespaceOrInstance = toArray<string | ITimbrDebug>(namespaceOrInstance);
+        namespaceOrInstance.forEach(ns => {
+          ns = toNamespace(ns) as string;
+          delete this._debuggers[ns];
+        });
       }
 
     };
 
     return methods;
+
+  }
+
+  /**
+   * Parse
+   * Parses log arguments and compiles event.
+   *
+   * @param type the type of log message to log.
+   * @param args the arguments to be logged.
+   */
+  parse(type: string, ...args: any[]) {
+
+    let baseType = type || '';
+
+    const clone = args.slice(0);
+    const subTypes = baseType.split(':');
+    baseType = subTypes.length ? subTypes.shift() : null;
+    const knownType = contains(this._levelKeys, baseType);
+    const debugr = baseType === 'debug' ? this.debuggers.get(subTypes[0]) : null;
+
+    let stack: IStacktraceResult;
+    let err, meta, ts, msg;
+    let event: ITimbrParsedEvent;
+    let fn: EventCallback = noop;
+
+    let prune = 0;
+    let pruneGen = debugr ? 2 : 2;
+
+    // Check if should convert to error level.
+    if (isError(clone[0]) && baseType !== this.options.errorLevel && this.options.errorConvert && !debugr) {
+      baseType = this.options.errorLevel;
+      type = subTypes.length ? baseType + ':' + subTypes.join(':') : baseType;
+    }
+
+    // Convert first arg to error.
+    if (baseType === this.options.errorLevel && this.options.errorConstruct && isString(clone[0])) {
+      clone[0] = new Error(clone[0]);
+      prune = 2;
+    }
+
+    let level: any = debugr ? debugr : this._levels[baseType] || null;
+    const idx = this.getIndex(type);
+    const activeIdx = this.getIndex(this.options.level);
+
+    // When debug ensure label is the type.
+    if (debugr)
+      level.label = type;
+
+    // Check if last is callback.
+    if (isFunction(last(clone))) {
+      fn = clone.pop();
+      args.pop();
+    }
+
+    // Check if last is metadata.
+    meta = isPlainObject(last(clone)) ? clone.pop() : null;
+
+    // Check if first arge is an Error.
+    err = isError(first(clone)) ? clone.shift() : null;
+
+    // Get stacktrace from error or fake it.
+    stack = err ?
+      this.parseStack(err.stack, prune) :
+      this.parseStack((new Error('get stack')).stack, pruneGen);
+
+    // Format the message.
+    if (clone.length) {
+      if (clone.length > 1) {
+        if (/(%s|%d|%i|%f|%j|%o|%O|%%)/g.test(clone[0])) {
+          msg = format(clone[0], clone.slice(1));
+        }
+        else {
+          msg = clone.join(' ');
+        }
+      }
+      else {
+        msg = clone[0];
+      }
+    }
+    else {
+      msg = '';
+    }
+
+    if (err) {
+      const origMsg = msg;
+      if (this.options.stackTrace)
+        msg = stack.stackTrace.join(EOL);
+      else
+        msg = stack.stackTrace[0];
+      // if orig msg contains val append it.
+      // probably never used but just in case.
+      if (origMsg && origMsg.length)
+        msg += (' \n' + origMsg);
+    }
+
+    event = {
+      type: type,
+      subTypes: subTypes,
+      level: level,
+      index: idx,
+      activeIndex: activeIdx,
+      message: msg, // this gets updated after compile.
+      timestamp: this.getTimestamp(),
+      meta: meta,
+      args: args,
+      error: err || null,
+      stack: stack,
+      fn: fn
+    };
+
+    let compiled = [];
+
+    // Ignore for write, writeLn and log levels.
+    if (!/^write/.test(baseType) && baseType !== 'log') {
+
+      // Add timestamp.
+      if (this.options.timestamp)
+        compiled.push(this.colorize(`[${event.timestamp}]`, this.options.timestampStyles));
+
+      // Add log level label.
+      if (this.options.labelLevels && event.type) {
+        let label = level.label;
+        let padding = '';
+        if (label === 'debug:default')
+          label = 'debug';
+        if (this.options.padLevels)
+          padding = this.pad(label || '');
+        if (label && label.length) {
+          label = this.colorize(padding + label + ':', level.styles as AnsiStyles[]);
+          compiled.push(label);
+        }
+      }
+
+      // Check for Symbol.
+      if (level && level.symbol && level.symbolPos === 'before')
+        compiled.push(this.colorize(level.symbol, level.symbolStyles));
+
+      compiled.push(event.message);
+
+      // Add metadata.
+      if (event.meta)
+        compiled.push(inspect(event.meta, { colors: this.options.colorize }));
+
+      // Add ministack if not error.
+      if (this.options.miniStack) {
+        if (!event.error || (event.error && !this.options.stackTrace))
+          compiled.push(this.colorize(event.stack.miniStack, 'gray'));
+      }
+
+      // Check for Symbol after.
+      if (level && level.symbol && level.symbolPos === 'after')
+        compiled.push(this.colorize(level.symbol, level.symbolStyles));
+
+    }
+    else {
+      compiled = [event.message];
+    }
+
+    event.compiled = compiled;
+
+    // Check for user defined before write method after compiling.
+    if (this.options.beforeWrite) {
+      event.message = this.options.beforeWrite(event);
+      event.compiled = [event.message];
+    }
+
+    return event;
+
+  }
+
+  /**
+   * Logger
+   * Common logger method which calls .parse();
+   *
+   * @param type the type of message to be logged.
+   * @param args the arguments to be logged.
+   */
+  logger(type: string, ...args: any[]) {
+
+    const stream = this.options.stream;
+    const event = this.parse(type, ...args);
+    const eventClone = clone<ITimbrParsedEvent>(event);
+
+    delete eventClone.fn;
+
+    // If debugOnly and we are debugging ensure is debug level.
+    if (this.options.debugOnly && isDebug())
+      return;
+
+    if (event.index > event.activeIndex)
+      return this;
+
+    let msg = event.compiled.join(' ');
+
+    if (type === 'write') {
+      stream.write(msg);
+    }
+    else {
+      stream.write(msg + EOL);
+    }
+
+    // Emit the log/debug event.
+    this.emit('log', eventClone.message, eventClone);
+
+    // Emit by type only if not null.
+    if (event.type)
+      this.emit(`log:${event.type}`, eventClone.message, eventClone);
+
+    // Call callback function passing parsed event.
+    event.fn(eventClone.message, eventClone);
+
+    if (this.options.errorExit && (event.level as ITimbrLevel).label === this.options.errorLevel)
+      process.exit(1);
+
+    return this;
 
   }
 
@@ -764,12 +855,10 @@ export class Timbr extends EventEmitter {
    * @param name the name of the symbol to return.
    */
   symbol(name: string, styles?: AnsiStyles | AnsiStyles[]) {
-    if (this._symbols[name])
-      name = this._symbols[name];
+    if (SYMBOLS[name])
+      name = SYMBOLS[name];
     styles = toArray(styles, []);
-    if (!styles.length)
-      return name;
-    return colurs.applyAnsi(name, styles);
+    return this.colorize(name, styles);
   }
 
   /**
@@ -778,9 +867,8 @@ export class Timbr extends EventEmitter {
    *
    * @param args arguments to output to stream directly.
    */
-  write(...args: any[]) {
-    const obj = this.logger('write:resolve', ...args) as ITimbrEventData;
-    this.stream.write(obj.message + EOL);
+  writeLn(...args: any[]) {
+    return this.logger('writeLn', ...args);
   }
 
   /**
@@ -789,10 +877,8 @@ export class Timbr extends EventEmitter {
    *
    * @param args the arguments to format and output.
    */
-  concat(...args: any[]) {
-    const obj = this.logger('write:resolve', ...args) as ITimbrEventData;
-    this.stream.write(obj.message);
-    return this;
+  write(...args: any[]) {
+    return this.logger('write', ...args);
   }
 
   /**
@@ -803,40 +889,6 @@ export class Timbr extends EventEmitter {
    */
   exit(code?: number) {
     process.exit(code || 0);
-  }
-
-  // DEPRECATED
-
-  /**
-   * Get
-   * Gets a current option value.
-   *
-   * @param key the option key to get.
-   */
-  get<T>(key: OptionKeys): T {
-    return this.options[<string>key];
-  }
-
-  /**
-   * Set
-   * Sets options for Logger.
-   *
-   * @param key the key or options object to be set.
-   * @param value the value for the key.
-   */
-  set(key: OptionKeys | ITimbrOptions, value?: any) {
-    let toggleExceptionHandler = key === 'errorCapture';
-    if (isPlainObject(key)) {
-      const _keys = keys(key as ITimbrOptions);
-      this.options = extend({}, this.options, key);
-      if (contains(_keys, 'errorCapture'))
-        toggleExceptionHandler = true;
-    }
-    else {
-      this.options[<string>key] = value;
-    }
-    if (toggleExceptionHandler)
-      this.toggleExceptionHandler(this.options.errorCapture);
   }
 
 }
@@ -850,16 +902,12 @@ export class Timbr extends EventEmitter {
  */
 export function create<L extends string>(options?: ITimbrOptions, levels?: ITimbrLevels): TimbrUnion<L> {
 
-  let logger;
-
   const instance = new Timbr(options, levels);
 
   function Logger(...args: any[]) {
-    if (args.length) {
-      const obj = instance.logger('log:resolve', ...args) as ITimbrEventData;
-      instance.stream.write(obj.message + EOL);
-    }
-    return logger;
+    if (args.length)
+      instance.logger('log', ...args);
+    return Logger;
   }
 
   for (const id in instance) {
@@ -875,18 +923,4 @@ export function create<L extends string>(options?: ITimbrOptions, levels?: ITimb
 export function init(options?: ITimbrOptions): TimbrUnion<LogLevelKeys> {
   return create<LogLevelKeys>(options, LOG_LEVELS);
 }
-
-export interface ITimbrDebug {
-  (...args: any[]);
-  namespace: string;
-  colorize: boolean;
-  styles: AnsiStyles | AnsiStyles[];
-  previous: number;
-  current: number;
-  elapsed: number;
-  enabled: boolean;
-  destroy(): void;
-}
-
-
 

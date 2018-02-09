@@ -32,34 +32,40 @@ exports.LOG_LEVELS = {
     warn: 'yellow',
     info: 'green',
     trace: 'cyan',
+    verbose: 'magenta',
     debug: 'blue'
 };
+var DEBUG_DEFAULTS = {
+    styles: 'blue'
+};
 var DEFAULTS = {
-    stream: undefined,
+    stream: process.stderr,
     level: 'info',
+    colorize: true,
     labelLevels: true,
     padLevels: true,
-    colorize: true,
+    timestamp: 'time',
+    timestampStyles: null,
+    timestampLocale: 'en-US',
+    timestampTimezone: 'UTC',
+    errorLevel: 'error',
     errorExit: false,
     errorConvert: false,
     errorCapture: false,
-    errorLevel: 'error',
     errorConstruct: false,
     stackTrace: true,
     stackDepth: 0,
-    prettyStack: false,
     miniStack: false,
-    timestamp: 'time',
     debugLevel: 'debug',
-    debugAuto: true,
-    debugOnly: false // when debugging only show debug level messages.
+    debugOnly: false,
+    beforeWrite: null // Called before writing to stream for customizing output.
 };
-var Timbr = (function (_super) {
+var Timbr = /** @class */ (function (_super) {
     __extends(Timbr, _super);
     function Timbr(options, levels) {
         var _this = _super.call(this) || this;
-        _this._debuggers = [];
-        _this._symbols = SYMBOLS;
+        _this._debuggers = {};
+        _this._activeDebuggers = [];
         _this.init(options, levels);
         return _this;
     }
@@ -83,18 +89,26 @@ var Timbr = (function (_super) {
         // Toggle the exception handler.
         this.toggleExceptionHandler(true);
         this.stream = options.stream || this.stream || process.stdout;
-        console.log(chek_1.isDebug());
-        console.log(process.env);
-        if ((chek_1.isDebug() || process.env.DEBUG) && options.debugAuto) {
-            var debugLevel = options.debugLevel;
-            if (~this._levelKeys.indexOf(debugLevel))
-                options.level = debugLevel;
-            if (process.env.DEBUG)
-                this.addDebugger(process.env.DEBUG);
+        if (chek_1.isDebug()) {
+            var envDebug = process.env.DEBUG;
+            var active = envDebug ? chek_1.split(envDebug.trim().replace(/  +/g, ''), [',', ' ']) : [];
+            console.log(process.env.DEBUG_ONLY);
+            if (!active.length)
+                this._activeDebuggers.push('default');
+            else
+                this._activeDebuggers = active;
+            if (process.env.DEBUG_ONLY)
+                this.options.debugOnly = true;
         }
         // Init methods.
         this._levelKeys.forEach(function (l, i) {
-            _this[l] = _this.logger.bind(_this, l);
+            if (l === _this.options.debugLevel) {
+                var _debugr = _this.debugger('default', _this._levels[l]);
+                _this[l] = _debugr.bind(_this);
+            }
+            else {
+                _this[l] = _this.logger.bind(_this, l);
+            }
         });
     };
     /**
@@ -109,22 +123,30 @@ var Timbr = (function (_super) {
                     label: k,
                     styles: chek_1.toArray(level_1, []),
                     symbol: null,
-                    symbolPos: 'after'
+                    symbolPos: 'after',
+                    symbolStyles: []
                 };
                 this._levels[k] = level_1;
             }
             else {
                 var lvl = this._levels[k];
-                this._levels[k] = chek_1.extend({}, lvl);
-                lvl.label = lvl.label || k;
+                lvl.label = lvl.label !== null ? lvl.label || k : null;
                 lvl.styles = chek_1.toArray(lvl.styles, []);
+                lvl.symbol = lvl.symbol || null;
+                lvl.symbolPos = lvl.symbolPos || 'after';
+                lvl.symbolStyles = lvl.symbolStyles;
+                // Check if known symbol.
+                if (SYMBOLS[lvl.symbol])
+                    lvl.symbol = SYMBOLS[lvl.symbol];
+                if ((lvl.symbolStyles !== null || !lvl.symbolStyles.length) && lvl.styles)
+                    lvl.symbolStyles = lvl.styles;
+                this._levels[k] = lvl;
             }
         }
         var levelKeys = this._levelKeys;
         var level = this.options.level;
-        var debugLevel = this.options.debugLevel;
         var errorLevel = this.options.errorLevel;
-        var exitLevel = this.options.errorExit;
+        // Ensure a default log level.
         var tmpLevel = level;
         if (chek_1.isNumber(level))
             tmpLevel = levelKeys[level] || 'info';
@@ -132,19 +154,16 @@ var Timbr = (function (_super) {
         if (!~levelKeys.indexOf(tmpLevel))
             tmpLevel = chek_1.last(levelKeys);
         level = this.options.level = tmpLevel;
-        // ensure debug level.
-        if (!~levelKeys.indexOf(debugLevel))
-            this.options.debugLevel = chek_1.last(this._levelKeys);
         // ensure error level
         if (!~levelKeys.indexOf(errorLevel))
             this.options.errorLevel = chek_1.first(this._levelKeys);
-    };
-    /**
-     * Is Debug
-     * Returns true if level matches debug level.
-     */
-    Timbr.prototype.isDebugging = function () {
-        return this.options.level === this.options.debugLevel;
+        // Ensure default log level config.
+        if (!this._levels['log'])
+            this._levels['log'] = {
+                label: 'log',
+                styles: null,
+                symbol: null
+            };
     };
     /**
      * Get Index
@@ -169,18 +188,6 @@ var Timbr = (function (_super) {
         return colurs.applyAnsi(val, styles);
     };
     /**
-     * Colorize If
-     * If colors are enabled apply ansi styles to value.
-     *
-     * @param val the value to be colorized.
-     * @param styles the styles to be applied.
-     */
-    Timbr.prototype.colorizeIf = function (val, styles) {
-        if (!this.options.colorize)
-            return val;
-        return this.colorize(val, styles);
-    };
-    /**
      * Parse Stack
      * Simple stack parser to limit and stylize stacktraces.
      *
@@ -189,27 +196,30 @@ var Timbr = (function (_super) {
      * @param depth the depth to trace.
      */
     Timbr.prototype.parseStack = function (stack, prune, depth) {
-        var _this = this;
-        prune = prune || 0;
-        depth = depth || this.options.stackDepth;
+        prune = chek_1.isEmpty(prune) ? 0 : prune;
+        depth = chek_1.isEmpty(depth) ? this.options.stackDepth : depth;
         if (!stack)
             return null;
         var frames = [];
         var traced = [];
         var miniStack;
-        stack.split(EOL)
-            .slice(prune)
+        stack = stack.split(EOL);
+        var first = stack.shift();
+        stack = stack.slice(prune);
+        stack.unshift(first);
+        stack
             .forEach(function (s, i) {
             if (i >= depth && depth !== 0)
                 return;
             var relativeFile, filename, column, line, method;
+            var orig = s;
             method = s;
             method = s.replace(/^\s*at\s?/, '').split(' ')[0];
             s = s.replace(/^\s+/, '').replace(/^.+\(/, '').replace(/\)$/, '');
             s = s.split(':');
             filename = s[0];
-            column = s[1];
-            line = s[2];
+            line = s[1];
+            column = s[2];
             var isModule = /^module/.test(filename);
             relativeFile = filename;
             // Make path relative to cwd if not
@@ -224,16 +234,15 @@ var Timbr = (function (_super) {
                 line: chek_1.toInteger(line, 0),
                 column: chek_1.toInteger(column, 0)
             };
-            // const trace = `    at ${this.colorizeIf(method || 'uknown', 'magenta')} (${this.colorizeIf(relativeFile, 'green')}:${this.colorizeIf(line, 'yellow')}:${this.colorizeIf(column, 'yellow')})`;
-            var trace = _this.colorizeIf("    at " + method + " (" + relativeFile + ":" + line + ":" + column + ")", 'gray');
-            if (i === 0)
-                miniStack = _this.colorizeIf("(" + parsedRelative.base + ":" + line + ":" + column + ")", 'gray');
+            // const trace = `    at ${method} (${relativeFile}:${line}:${column})`;
+            if (i === 1)
+                miniStack = "(" + parsedRelative.base + ":" + line + ":" + column + ")";
             frames.push(frame);
-            traced.push(trace);
+            traced.push(orig);
         });
         return {
-            frames: frames,
-            stack: traced,
+            stackFrames: frames,
+            stackTrace: traced,
             miniStack: miniStack
         };
     };
@@ -245,30 +254,27 @@ var Timbr = (function (_super) {
      */
     Timbr.prototype.getTimestamp = function (format) {
         format = format || this.options.timestamp;
-        var config = {
-            format: 'time',
-            styles: 'gray',
-            date: new Date(),
-            timestamp: null
-        };
-        if (chek_1.isPlainObject(format)) {
-            chek_1.extend(config, format);
-        }
-        else {
-            config.format = format;
-        }
-        if (chek_1.isFunction(config.format)) {
-            config.timestamp = config.format();
-        }
-        else {
-            var ts = config.date.toISOString();
-            var split = ts.replace('Z', '').split('T');
-            if (config.format === 'time')
-                config.timestamp = split[1];
-            else
-                config.timestamp = split[0] + " " + split[1];
-        }
-        return config;
+        var date = new Date();
+        var dt = date.toLocaleString(this.options.timestampLocale, { timeZone: this.options.timestampTimezone, hour12: false });
+        var result;
+        dt = dt.replace(' ', '').split(',');
+        var localeDate = dt[0];
+        var localeTime = dt[1];
+        localeDate = localeDate
+            .split('/')
+            .map(function (v) { return v.length < 2 ? '0' + v : v; })
+            .join('-');
+        if (chek_1.isFunction(format))
+            result = format();
+        else if (format === 'epoch')
+            result = date.getTime() + '';
+        else if (format === 'iso')
+            result = date.toISOString();
+        else if (format === 'time')
+            result = localeTime;
+        else if (format === 'datetime')
+            result = localeDate + ' ' + localeTime;
+        return result;
     };
     /**
      * Uncaught Exception
@@ -277,16 +283,14 @@ var Timbr = (function (_super) {
      * @param err the error caught by process uncaughtException.
      */
     Timbr.prototype.uncaughtException = function (err) {
-        var _this = this;
         var errorLevel = this.options.errorLevel;
-        if (!this.options.errorCapture || !this.exists(errorLevel))
+        var exists = ~this.getIndex(errorLevel);
+        if (!this.options.errorCapture || !exists)
             throw err;
-        var origLevel = errorLevel;
-        errorLevel += ':exception';
-        this.logger(errorLevel, err, function () {
-            _this.toggleExceptionHandler(false);
-            process.exit(1); // always exit on uncaught errors.
-        });
+        // Disable to prevent loops will exit after catching.
+        this.toggleExceptionHandler(false);
+        this.logger(errorLevel, err);
+        process.exit(1);
     };
     /**
      * Toggle Exception Handler
@@ -301,34 +305,6 @@ var Timbr = (function (_super) {
             process.on('uncaughtException', this.uncaughtException.bind(this));
     };
     /**
-     * Add Debugger
-     * : Adds a debugger group if does not already exist.
-     *
-     * @param group the debugger group to add.
-     */
-    Timbr.prototype.addDebugger = function (group) {
-        if (!~this._debuggers.indexOf(group))
-            this._debuggers.push(group);
-    };
-    /**
-     * Remove Debugger
-     * : Removes the specified group from debuggers.
-     *
-     * @param group the debugger group to remove.
-     */
-    Timbr.prototype.removeDebugger = function (group) {
-        this._debuggers = this._debuggers.filter(function (d) { return d !== group; });
-    };
-    /**
-     * Exists Debugger
-     * Checks if a debugger exists.
-     *
-     * @param group the group to be checked.
-     */
-    Timbr.prototype.existsDebugger = function (group) {
-        return ~this._debuggers.indexOf(group);
-    };
-    /**
      * Pad
      * : Gets padding for level type.
      *
@@ -340,181 +316,30 @@ var Timbr = (function (_super) {
             return '';
         var max = 0;
         var len = type.length;
-        var i = this._levelKeys.length;
+        var i;
         var padding = '';
         offset = chek_1.isString(offset) ? offset.length : offset;
         offset = offset || 0;
-        function pad(l) {
-            var s = '';
-            while (l--)
-                s += ' ';
-            return s;
+        var debugLevels = (this._activeDebuggers || []).map(function (l) {
+            if (l === 'default')
+                return 'debug';
+            return "debug:" + l;
+        });
+        var levels = [];
+        for (var k in this._levels) {
+            var level = this._levels[k];
+            if (level.label !== null)
+                levels.push(level.label);
         }
-        var debugLevels = (this._debuggers || []).map(function (l) { return "debug-" + l; });
-        var levels = this._levelKeys.concat(debugLevels);
+        levels = levels.concat(debugLevels);
+        i = levels.length;
         while (i--) {
-            //  const diff = this._levelKeys[i].length - len;
             var diff = levels[i].length - len;
-            if (diff > 0)
-                padding = pad(diff + offset);
+            var t = levels[i];
+            if (diff > 0 && (padding.length < diff + offset))
+                padding = ' '.repeat(diff + offset);
         }
         return padding;
-    };
-    /**
-     * Logger
-     * : Common logger method.
-     *
-     * @param type the type of log message to log.
-     * @param args the arguments to be logged.
-     */
-    Timbr.prototype.logger = function (type) {
-        var args = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            args[_i - 1] = arguments[_i];
-        }
-        var clone = args.slice(0);
-        var origType = type;
-        var splitType = type ? type.split(':') : null;
-        type = splitType[0];
-        // Flags used internally.
-        var isResolve = chek_1.contains(splitType, 'resolve');
-        var isException = chek_1.contains(splitType, 'exception');
-        var debugGroup = type === 'debug' && splitType[1];
-        var knownType = chek_1.contains(this._levelKeys, type);
-        var emitType = !debugGroup ? splitType[0] : origType;
-        var stackTrace;
-        var err, errMsg, meta, metaFormatted, tsFmt, tsDate, msg, normalized, rawMsg, errType;
-        var event;
-        var fn = chek_1.noop;
-        var result = [];
-        var suffix = [];
-        var pruneTrace = 1;
-        // Converts to error if first arg is instance of Error.
-        if ((clone[0] instanceof Error) && this.options.errorConvert)
-            type = this.options.errorLevel;
-        if (type === this.options.errorLevel && this.options.errorConstruct && chek_1.isString(clone[0])) {
-            clone[0] = new Error(clone[0]);
-            pruneTrace = 2;
-        }
-        var level = (knownType ? this._levels[type] : null);
-        var idx = this.getIndex(type);
-        var activeIdx = this.getIndex(this.options.level);
-        // If debugOnly and we are debugging ensure is debug level.
-        if (this.options.debugOnly &&
-            this.isDebugging() &&
-            type !== this.options.level)
-            return this;
-        // Check if is loggable level.
-        if (!isResolve && (idx > activeIdx))
-            return this;
-        if (chek_1.isFunction(chek_1.last(clone))) {
-            fn = clone.pop();
-            args.pop();
-        }
-        meta = chek_1.isPlainObject(chek_1.last(clone)) ? clone.pop() : null;
-        err = chek_1.isError(chek_1.first(clone)) ? clone.shift() : null;
-        stackTrace = err ?
-            this.parseStack(err.stack, pruneTrace) :
-            this.parseStack((new Error('get stack')).stack, 2);
-        // Add optional timestamp.
-        if (this.options.timestamp) {
-            var ts = this.getTimestamp();
-            tsFmt = ts.timestamp;
-            tsDate = ts.date;
-            result.push(this.colorizeIf("[" + tsFmt + "]", ts.styles));
-        }
-        // Add error type if not generic 'Error'.
-        errType = err && err.name !== 'Error' ? ":" + err.name : '';
-        // Add log label type.
-        if (knownType && this.options.labelLevels) {
-            var styledType = this.colorizeIf(type, level.styles);
-            var styledDebugType = void 0;
-            var unstyledDebugType = '-' + debugGroup;
-            var padType = type;
-            if (debugGroup) {
-                styledDebugType = this.colorizeIf(unstyledDebugType, 'gray');
-                styledType += styledDebugType;
-            }
-            var padding = this.pad(type);
-            styledType += this.colorizeIf(errType, level.styles);
-            result.push(padding + styledType + ':');
-        }
-        // If error we need to build the message.
-        if (err) {
-            errMsg = (err.message || 'Uknown Error');
-            clone.unshift(errMsg);
-        }
-        rawMsg = clone[0] || null;
-        // Format the message.
-        if (clone.length) {
-            if (clone.length > 1) {
-                if (/(%s|%d|%j|%%)/g.test(clone[0])) {
-                    rawMsg = util_1.format(clone[0], clone.slice(1));
-                    result.push(rawMsg);
-                }
-                else {
-                    rawMsg = clone.join(' ');
-                    result.push(rawMsg);
-                }
-            }
-            else {
-                result.push(clone[0]);
-            }
-        }
-        // Add formatted metadata to result.
-        if (meta) {
-            metaFormatted = util_1.format(util_1.inspect(meta, null, null, this.options.colorize));
-            result.push(metaFormatted);
-        }
-        // Add ministack.
-        if (this.options.miniStack && stackTrace)
-            result.push(this.colorizeIf(stackTrace.miniStack, 'gray'));
-        // Add stack trace if error.
-        if (err && stackTrace) {
-            if (this.options.prettyStack)
-                suffix.push(util_1.format(util_1.inspect(stackTrace.frames, null, null, this.options.colorize)));
-            else
-                suffix.push(stackTrace.stack.join(EOL));
-        }
-        msg = result.join(' ');
-        msg = (suffix.length ? msg + EOL + suffix.join(EOL) : msg) + EOL;
-        // Output to stream if not resolving event result.
-        if (!isResolve)
-            this.stream.write(msg);
-        event = {
-            timestamp: tsDate,
-            type: type,
-            message: rawMsg + (metaFormatted || ''),
-            formatted: msg,
-            meta: meta,
-            args: args,
-            error: err,
-            stackTrace: stackTrace.frames,
-        };
-        // Emit logged and logged by type listeners.
-        this.emit('log', event);
-        this.emit("log:" + emitType, event);
-        // Call local callback.
-        fn(event);
-        // Toggle the exception for.
-        if (isException)
-            this.toggleExceptionHandler(false);
-        // If no ouput return object.
-        if (isResolve)
-            return event;
-        // Check if should exit on error.
-        if (type === this.options.errorLevel && this.options.errorExit)
-            process.exit();
-        return this;
-    };
-    /**
-     * Exists
-     * : Checks if level exists in levels.
-     *
-     * @param level the key to check.
-     */
-    Timbr.prototype.exists = function (level) {
-        return !!~this.getIndex(level);
     };
     /**
      * Get
@@ -548,51 +373,328 @@ var Timbr = (function (_super) {
     };
     /**
      * Debugger
-     * : Creates a new grouped debugger.
+     * Creates a new debugger instance.
      *
-     * @param group enables debugging by active group.
+     * @param namespace creates a debugger by namespace.
+     * @param options debugger options.
      */
-    Timbr.prototype.debugger = function (group) {
-        // If no debuggers yet add unless explicitly disabled.
-        // if ((!this._debuggers.length && enabled !== false) || enabled === true)
-        //   this.addDebugger(group);
-        var _this = this;
-        // if (enabled === false)
-        //   this.removeDebugger(group);
-        if (this.existsDebugger(group))
-            this.removeDebugger(group);
-        else
-            this.addDebugger(group);
-        return {
-            log: function () {
-                var args = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    args[_i] = arguments[_i];
-                }
-                if (!~_this._debuggers.indexOf(group))
-                    return;
-                _this.logger.apply(_this, ["debug:" + group].concat(args));
-            },
-            write: function () {
-                var args = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    args[_i] = arguments[_i];
-                }
-                if (!~_this._debuggers.indexOf(group))
-                    return;
-                _this.write.apply(_this, args);
-            },
-            exit: this.exit
-            // enable: this.addDebugger.bind(this, group),
-            // disable: this.removeDebugger.bind(this, group)
+    Timbr.prototype.debugger = function (namespace, options) {
+        var self = this;
+        var previous;
+        if (chek_1.isPlainObject(namespace)) {
+            options = namespace;
+            namespace = undefined;
+        }
+        namespace = namespace || 'default';
+        // Check if debugger exists.
+        if (this._debuggers[namespace])
+            return this._debuggers[namespace];
+        options = chek_1.extend({}, DEBUG_DEFAULTS, options);
+        var debug = function () {
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i] = arguments[_i];
+            }
+            if (!chek_1.isDebug() || !~self._activeDebuggers.indexOf(namespace))
+                return self;
+            var current = +new Date();
+            var elapsed = current - (previous || current);
+            debug.previous = previous;
+            debug.current = current;
+            debug.elasped = elapsed;
+            previous = current;
+            var event = self.parse.apply(self, ["debug:" + namespace].concat(args));
+            var msg = event.compiled.join(' ');
+            self.options.stream.write(msg + self.colorize(" (" + elapsed + "ms)", debug.styles) + EOL);
+            self.emit('debug', event.message, event);
+            self.emit("" + event.type, event.message, event);
+            event.fn(event.message, event);
+            return self;
         };
+        debug.namespace = namespace;
+        debug.styles = options.styles;
+        debug.symbol = options.symbol || null;
+        debug.symbolPos = options.symbolPos || 'after';
+        debug.symbolStyles = options.symbolStyles !== null ? options.symbolStyles || debug.styles || [] : null;
+        debug.enabled = self.debuggers.enabled.bind(self, namespace);
+        debug.enable = self.debuggers.enable.bind(self, namespace);
+        debug.disable = self.debuggers.disable.bind(self, namespace);
+        debug.destroy = self.debuggers.destroy.bind(self, namespace);
+        // Add to collection.
+        this._debuggers[namespace] = debug;
+        return debug;
+    };
+    Object.defineProperty(Timbr.prototype, "debuggers", {
+        get: function () {
+            var _this = this;
+            function toNamespace(instance) {
+                if (chek_1.isString(instance)) {
+                    return instance.replace(/^debug:/, '');
+                }
+                return instance.namespace;
+            }
+            var methods = {
+                /**
+                 * Get
+                 * Gets a debugger.
+                 */
+                get: function (namespace) {
+                    var ns = toNamespace(namespace);
+                    return _this._debuggers[ns];
+                },
+                /**
+                 * Get All
+                 * Gets an object containing all debuggers.
+                 */
+                getAll: function () {
+                    return _this._debuggers;
+                },
+                /**
+                 * Create
+                 * Creates a debugger.
+                 *
+                 * @param namespace the namespace of the debugger to be created.
+                 */
+                create: function (namespace, options) {
+                    var ns = toNamespace(namespace);
+                    var instance = _this.debugger(ns, options);
+                    _this._debuggers[ns] = instance;
+                },
+                /**
+                 * Enabled
+                 * Checks if namespace or instance is enabled.
+                 *
+                 * @param namespaceOrInstnace the ns or instance to check.
+                 */
+                enabled: function (namespaceOrInstance) {
+                    var ns = toNamespace(namespaceOrInstance);
+                    return !!~_this._activeDebuggers.indexOf(ns);
+                },
+                /**
+                 * Enable
+                 * Enables a namespace, instance or array of namespaces or instances.
+                 *
+                 * @param namespaceOrInstnace the ns or instance to enable.
+                 */
+                enable: function (namespaceOrInstance) {
+                    namespaceOrInstance = chek_1.toArray(namespaceOrInstance);
+                    namespaceOrInstance.forEach(function (ns) {
+                        ns = toNamespace(ns);
+                        if (!~_this._activeDebuggers.indexOf(ns))
+                            _this._activeDebuggers.push(ns);
+                    });
+                },
+                /**
+                 * Disable
+                 * Disables a namespace, instance or array of namespaces or instances.
+                 *
+                 * @param namespaceOrInstnace the ns or instance to disable.
+                 */
+                disable: function (namespaceOrInstance) {
+                    namespaceOrInstance = chek_1.toArray(namespaceOrInstance);
+                    namespaceOrInstance.forEach(function (ns) {
+                        ns = toNamespace(ns);
+                        _this._activeDebuggers.splice(_this._activeDebuggers.indexOf(ns), 1);
+                    });
+                },
+                /**
+                 * Destroy
+                 * Destroys a namespace, instance or array of namespaces or instances.
+                 *
+                 * @param namespaceOrInstnace the ns or instance to destroy.
+                 */
+                destroy: function (namespaceOrInstance) {
+                    namespaceOrInstance = chek_1.toArray(namespaceOrInstance);
+                    namespaceOrInstance.forEach(function (ns) {
+                        ns = toNamespace(ns);
+                        delete _this._debuggers[ns];
+                    });
+                }
+            };
+            return methods;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    /**
+     * Parse
+     * Parses log arguments and compiles event.
+     *
+     * @param type the type of log message to log.
+     * @param args the arguments to be logged.
+     */
+    Timbr.prototype.parse = function (type) {
+        var args = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            args[_i - 1] = arguments[_i];
+        }
+        var baseType = type || '';
+        var clone = args.slice(0);
+        var subTypes = baseType.split(':');
+        baseType = subTypes.length ? subTypes.shift() : null;
+        var knownType = chek_1.contains(this._levelKeys, baseType);
+        var debugr = baseType === 'debug' ? this.debuggers.get(subTypes[0]) : null;
+        var stack;
+        var err, meta, ts, msg;
+        var event;
+        var fn = chek_1.noop;
+        var prune = 0;
+        var pruneGen = debugr ? 2 : 2;
+        // Check if should convert to error level.
+        if (chek_1.isError(clone[0]) && baseType !== this.options.errorLevel && this.options.errorConvert && !debugr) {
+            baseType = this.options.errorLevel;
+            type = subTypes.length ? baseType + ':' + subTypes.join(':') : baseType;
+        }
+        // Convert first arg to error.
+        if (baseType === this.options.errorLevel && this.options.errorConstruct && chek_1.isString(clone[0])) {
+            clone[0] = new Error(clone[0]);
+            prune = 2;
+        }
+        var level = debugr ? debugr : this._levels[baseType] || null;
+        var idx = this.getIndex(type);
+        var activeIdx = this.getIndex(this.options.level);
+        // When debug ensure label is the type.
+        if (debugr)
+            level.label = type;
+        // Check if last is callback.
+        if (chek_1.isFunction(chek_1.last(clone))) {
+            fn = clone.pop();
+            args.pop();
+        }
+        // Check if last is metadata.
+        meta = chek_1.isPlainObject(chek_1.last(clone)) ? clone.pop() : null;
+        // Check if first arge is an Error.
+        err = chek_1.isError(chek_1.first(clone)) ? clone.shift() : null;
+        // Get stacktrace from error or fake it.
+        stack = err ?
+            this.parseStack(err.stack, prune) :
+            this.parseStack((new Error('get stack')).stack, pruneGen);
+        // Format the message.
+        if (clone.length) {
+            if (clone.length > 1) {
+                if (/(%s|%d|%i|%f|%j|%o|%O|%%)/g.test(clone[0])) {
+                    msg = util_1.format(clone[0], clone.slice(1));
+                }
+                else {
+                    msg = clone.join(' ');
+                }
+            }
+            else {
+                msg = clone[0];
+            }
+        }
+        else {
+            msg = '';
+        }
+        if (err) {
+            var origMsg = msg;
+            if (this.options.stackTrace)
+                msg = stack.stackTrace.join(EOL);
+            else
+                msg = stack.stackTrace[0];
+            // if orig msg contains val append it.
+            // probably never used but just in case.
+            if (origMsg && origMsg.length)
+                msg += (' \n' + origMsg);
+        }
+        event = {
+            type: type,
+            subTypes: subTypes,
+            level: level,
+            index: idx,
+            activeIndex: activeIdx,
+            message: msg,
+            timestamp: this.getTimestamp(),
+            meta: meta,
+            args: args,
+            error: err || null,
+            stack: stack,
+            fn: fn
+        };
+        var compiled = [];
+        // Ignore for write, writeLn and log levels.
+        if (!/^write/.test(baseType) && baseType !== 'log') {
+            // Add timestamp.
+            if (this.options.timestamp)
+                compiled.push(this.colorize("[" + event.timestamp + "]", this.options.timestampStyles));
+            // Add log level label.
+            if (this.options.labelLevels && event.type) {
+                var label = level.label;
+                var padding = '';
+                if (label === 'debug:default')
+                    label = 'debug';
+                if (this.options.padLevels)
+                    padding = this.pad(label || '');
+                if (label && label.length) {
+                    label = this.colorize(padding + label + ':', level.styles);
+                    compiled.push(label);
+                }
+            }
+            // Check for Symbol.
+            if (level && level.symbol && level.symbolPos === 'before')
+                compiled.push(this.colorize(level.symbol, level.symbolStyles));
+            compiled.push(event.message);
+            // Add metadata.
+            if (event.meta)
+                compiled.push(util_1.inspect(event.meta, { colors: this.options.colorize }));
+            // Add ministack if not error.
+            if (this.options.miniStack) {
+                if (!event.error || (event.error && !this.options.stackTrace))
+                    compiled.push(this.colorize(event.stack.miniStack, 'gray'));
+            }
+            // Check for Symbol after.
+            if (level && level.symbol && level.symbolPos === 'after')
+                compiled.push(this.colorize(level.symbol, level.symbolStyles));
+        }
+        else {
+            compiled = [event.message];
+        }
+        event.compiled = compiled;
+        // Check for user defined before write method after compiling.
+        if (this.options.beforeWrite) {
+            event.message = this.options.beforeWrite(event);
+            event.compiled = [event.message];
+        }
+        return event;
     };
     /**
-     * Debuggers
-     * : Returns list of debuggers.
+     * Logger
+     * Common logger method which calls .parse();
+     *
+     * @param type the type of message to be logged.
+     * @param args the arguments to be logged.
      */
-    Timbr.prototype.debuggers = function () {
-        return this._debuggers;
+    Timbr.prototype.logger = function (type) {
+        var args = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            args[_i - 1] = arguments[_i];
+        }
+        var stream = this.options.stream;
+        var event = this.parse.apply(this, [type].concat(args));
+        var eventClone = chek_1.clone(event);
+        delete eventClone.fn;
+        // If debugOnly and we are debugging ensure is debug level.
+        if (this.options.debugOnly && chek_1.isDebug())
+            return;
+        if (event.index > event.activeIndex)
+            return this;
+        var msg = event.compiled.join(' ');
+        if (type === 'write') {
+            stream.write(msg);
+        }
+        else {
+            stream.write(msg + EOL);
+        }
+        // Emit the log/debug event.
+        this.emit('log', eventClone.message, eventClone);
+        // Emit by type only if not null.
+        if (event.type)
+            this.emit("log:" + event.type, eventClone.message, eventClone);
+        // Call callback function passing parsed event.
+        event.fn(eventClone.message, eventClone);
+        if (this.options.errorExit && event.level.label === this.options.errorLevel)
+            process.exit(1);
+        return this;
     };
     /**
      * Symbol
@@ -601,12 +703,10 @@ var Timbr = (function (_super) {
      * @param name the name of the symbol to return.
      */
     Timbr.prototype.symbol = function (name, styles) {
-        if (this._symbols[name])
-            name = this._symbols[name];
+        if (SYMBOLS[name])
+            name = SYMBOLS[name];
         styles = chek_1.toArray(styles, []);
-        if (!styles.length)
-            return name;
-        return colurs.applyAnsi(name, styles);
+        return this.colorize(name, styles);
     };
     /**
      * Write
@@ -614,13 +714,12 @@ var Timbr = (function (_super) {
      *
      * @param args arguments to output to stream directly.
      */
-    Timbr.prototype.write = function () {
+    Timbr.prototype.writeLn = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        var obj = this.logger.apply(this, ['write:resolve'].concat(args));
-        this.stream.write(obj.message + EOL);
+        return this.logger.apply(this, ['writeLn'].concat(args));
     };
     /**
      * Concat
@@ -628,14 +727,12 @@ var Timbr = (function (_super) {
      *
      * @param args the arguments to format and output.
      */
-    Timbr.prototype.concat = function () {
+    Timbr.prototype.write = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        var obj = this.logger.apply(this, ['write:resolve'].concat(args));
-        this.stream.write(obj.message);
-        return this;
+        return this.logger.apply(this, ['write'].concat(args));
     };
     /**
      * Exit
@@ -646,52 +743,9 @@ var Timbr = (function (_super) {
     Timbr.prototype.exit = function (code) {
         process.exit(code || 0);
     };
-    // DEPRECATED
-    /**
-     * Get
-     * Gets a current option value.
-     *
-     * @param key the option key to get.
-     */
-    Timbr.prototype.get = function (key) {
-        return this.options[key];
-    };
-    /**
-     * Set
-     * Sets options for Logger.
-     *
-     * @param key the key or options object to be set.
-     * @param value the value for the key.
-     */
-    Timbr.prototype.set = function (key, value) {
-        var toggleExceptionHandler = key === 'errorCapture';
-        if (chek_1.isPlainObject(key)) {
-            var _keys = chek_1.keys(key);
-            this.options = chek_1.extend({}, this.options, key);
-            if (chek_1.contains(_keys, 'errorCapture'))
-                toggleExceptionHandler = true;
-        }
-        else {
-            this.options[key] = value;
-        }
-        if (toggleExceptionHandler)
-            this.toggleExceptionHandler(this.options.errorCapture);
-    };
     return Timbr;
 }(events_1.EventEmitter));
 exports.Timbr = Timbr;
-function intersect(first, second) {
-    var result = {};
-    for (var id in first) {
-        result[id] = first[id];
-    }
-    for (var id in second) {
-        if (!result.hasOwnProperty(id)) {
-            result[id] = second[id];
-        }
-    }
-    return result;
-}
 /**
  * Create
  * Creates a new instance of Timbr.
@@ -700,18 +754,15 @@ function intersect(first, second) {
  * @param levels the log levels to be used.
  */
 function create(options, levels) {
-    var logger;
     var instance = new Timbr(options, levels);
     function Logger() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        if (args.length) {
-            var obj = instance.logger.apply(instance, ['log:resolve'].concat(args));
-            instance.stream.write(obj.message + EOL);
-        }
-        return logger;
+        if (args.length)
+            instance.logger.apply(instance, ['log'].concat(args));
+        return Logger;
     }
     for (var id in instance) {
         Logger[id] = instance[id];

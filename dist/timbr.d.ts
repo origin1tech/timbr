@@ -1,19 +1,20 @@
 /// <reference types="node" />
 import { EventEmitter } from 'events';
-import { ITimbrEventData, ITimbrOptions, OptionKeys, AnsiStyles, ITimbrLevels, TimbrUnion, ITimbrDebugger } from './interfaces';
+import { ITimbrOptions, IMap, OptionKeys, AnsiStyles, ITimbrLevels, TimbrUnion, ITimbrParsedEvent, ITimbrDebug, DebuggerOrNamespace, ITimbrDebugOptions } from './interfaces';
 export declare const LOG_LEVELS: {
     error: string[];
     warn: string;
     info: string;
     trace: string;
+    verbose: string;
     debug: string;
 };
 export declare type LogLevelKeys = keyof typeof LOG_LEVELS;
 export declare class Timbr extends EventEmitter {
     private _debuggers;
+    private _activeDebuggers;
     private _levels;
     private _levelKeys;
-    private _symbols;
     stream: NodeJS.WritableStream;
     options: ITimbrOptions;
     constructor(options?: ITimbrOptions, levels?: ITimbrLevels);
@@ -31,11 +32,6 @@ export declare class Timbr extends EventEmitter {
      */
     private normalizeLevels();
     /**
-     * Is Debug
-     * Returns true if level matches debug level.
-     */
-    private isDebugging();
-    /**
      * Get Index
      * Gets the index of a value in an array.
      *
@@ -51,14 +47,6 @@ export declare class Timbr extends EventEmitter {
      * @param styles the styles to be applied.
      */
     private colorize(val, styles);
-    /**
-     * Colorize If
-     * If colors are enabled apply ansi styles to value.
-     *
-     * @param val the value to be colorized.
-     * @param styles the styles to be applied.
-     */
-    private colorizeIf(val, styles?);
     /**
      * Parse Stack
      * Simple stack parser to limit and stylize stacktraces.
@@ -88,28 +76,7 @@ export declare class Timbr extends EventEmitter {
      *
      * @param capture whether to capture uncaught exceptions or not.
      */
-    private toggleExceptionHandler(capture?);
-    /**
-     * Add Debugger
-     * : Adds a debugger group if does not already exist.
-     *
-     * @param group the debugger group to add.
-     */
-    private addDebugger(group);
-    /**
-     * Remove Debugger
-     * : Removes the specified group from debuggers.
-     *
-     * @param group the debugger group to remove.
-     */
-    private removeDebugger(group);
-    /**
-     * Exists Debugger
-     * Checks if a debugger exists.
-     *
-     * @param group the group to be checked.
-     */
-    private existsDebugger(group);
+    private toggleExceptionHandler(capture);
     /**
      * Pad
      * : Gets padding for level type.
@@ -118,21 +85,6 @@ export declare class Timbr extends EventEmitter {
      * @param offset additional offset.
      */
     private pad(type, offset?);
-    /**
-     * Logger
-     * : Common logger method.
-     *
-     * @param type the type of log message to log.
-     * @param args the arguments to be logged.
-     */
-    logger(type: string, ...args: any[]): ITimbrEventData | this;
-    /**
-     * Exists
-     * : Checks if level exists in levels.
-     *
-     * @param level the key to check.
-     */
-    exists(level: any): boolean;
     /**
      * Get
      * Gets a current option value.
@@ -150,37 +102,65 @@ export declare class Timbr extends EventEmitter {
     setOption(key: OptionKeys | ITimbrOptions, value?: any): void;
     /**
      * Debugger
-     * : Creates a new grouped debugger.
+     * Creates a new debugger instance.
      *
-     * @param group enables debugging by active group.
+     * @param options debugger options.
      */
-    debugger(group: string): ITimbrDebugger;
+    debugger(options: ITimbrDebugOptions): ITimbrDebug;
     /**
-     * Debuggers
-     * : Returns list of debuggers.
+     * Debugger
+     * Creates a new debugger instance.
+     *
+     * @param namespace creates a debugger by namespace.
+     * @param options debugger options.
      */
-    debuggers(): string[];
+    debugger(namespace?: string | ITimbrDebugOptions, options?: ITimbrDebugOptions): ITimbrDebug;
+    readonly debuggers: {
+        get: (namespace: string) => ITimbrDebug;
+        getAll: () => IMap<ITimbrDebug>;
+        create: (namespace: string, options?: ITimbrDebugOptions) => void;
+        enabled: (namespaceOrInstance: string | ITimbrDebug) => boolean;
+        enable: (namespaceOrInstance: DebuggerOrNamespace) => void;
+        disable: (namespaceOrInstance: DebuggerOrNamespace) => void;
+        destroy: (namespaceOrInstance: DebuggerOrNamespace) => void;
+    };
+    /**
+     * Parse
+     * Parses log arguments and compiles event.
+     *
+     * @param type the type of log message to log.
+     * @param args the arguments to be logged.
+     */
+    parse(type: string, ...args: any[]): ITimbrParsedEvent;
+    /**
+     * Logger
+     * Common logger method which calls .parse();
+     *
+     * @param type the type of message to be logged.
+     * @param args the arguments to be logged.
+     */
+    logger(type: string, ...args: any[]): this;
     /**
      * Symbol
      * : Gets known symbol for terminal or returns empty string.
      *
      * @param name the name of the symbol to return.
      */
-    symbol(name: string, styles?: AnsiStyles | AnsiStyles[]): string | any[];
+    symbol(name: string, styles?: AnsiStyles | AnsiStyles[]): any;
     /**
      * Write
      * : Directly outputs to stream after formatting.
      *
      * @param args arguments to output to stream directly.
      */
-    write(...args: any[]): void;
+    writeLn(...args: any[]): this;
     /**
      * Concat
      * : Same as write but concats to stream without line return appended.
      *
      * @param args the arguments to format and output.
      */
-    concat(...args: any[]): this;
+    write(...args: any[]): this;
     /**
      * Exit
      * : Causes immediate exit.
@@ -188,21 +168,6 @@ export declare class Timbr extends EventEmitter {
      * @param code the exit code if any.
      */
     exit(code?: number): void;
-    /**
-     * Get
-     * Gets a current option value.
-     *
-     * @param key the option key to get.
-     */
-    get<T>(key: OptionKeys): T;
-    /**
-     * Set
-     * Sets options for Logger.
-     *
-     * @param key the key or options object to be set.
-     * @param value the value for the key.
-     */
-    set(key: OptionKeys | ITimbrOptions, value?: any): void;
 }
 /**
  * Create
