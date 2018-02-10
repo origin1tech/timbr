@@ -7,7 +7,11 @@ export declare const LOG_LEVELS: {
     info: string;
     trace: string;
     verbose: string;
-    debug: string;
+    debug: {
+        styles: string;
+        indent: string;
+        timestamp: boolean;
+    };
 };
 export declare type LogLevelKeys = keyof typeof LOG_LEVELS;
 export declare class Timbr extends EventEmitter {
@@ -39,14 +43,6 @@ export declare class Timbr extends EventEmitter {
      * @param arr the array to be inspected.
      */
     private getIndex(level);
-    /**
-     * Colorize
-     * Applies ansi styles to value.
-     *
-     * @param val the value to be colorized.
-     * @param styles the styles to be applied.
-     */
-    private colorize(val, styles);
     /**
      * Parse Stack
      * Simple stack parser to limit and stylize stacktraces.
@@ -84,7 +80,7 @@ export declare class Timbr extends EventEmitter {
      * @param type the log level type.
      * @param offset additional offset.
      */
-    private pad(type, offset?);
+    private pad(type, offset?, group?);
     /**
      * Get
      * Gets a current option value.
@@ -100,6 +96,14 @@ export declare class Timbr extends EventEmitter {
      * @param value the value for the key.
      */
     setOption(key: OptionKeys | ITimbrOptions, value?: any): void;
+    /**
+     * Colorize
+     * Applies ansi styles to value.
+     *
+     * @param val the value to be colorized.
+     * @param styles the styles to be applied.
+     */
+    colorize(val: any, styles: AnsiStyles | AnsiStyles[]): any;
     /**
      * Debugger
      * Creates a new debugger instance.

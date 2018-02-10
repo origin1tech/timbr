@@ -33,7 +33,11 @@ exports.LOG_LEVELS = {
     info: 'green',
     trace: 'cyan',
     verbose: 'magenta',
-    debug: 'blue'
+    debug: {
+        styles: 'blue',
+        indent: '     ',
+        timestamp: false
+    }
 };
 var DEBUG_DEFAULTS = {
     styles: 'blue'
@@ -42,8 +46,8 @@ var DEFAULTS = {
     stream: process.stderr,
     level: 'info',
     colorize: true,
-    labelLevels: true,
-    padLevels: true,
+    labels: true,
+    padding: true,
     timestamp: 'time',
     timestampStyles: null,
     timestampLocale: 'en-US',
@@ -92,7 +96,6 @@ var Timbr = /** @class */ (function (_super) {
         if (chek_1.isDebug()) {
             var envDebug = process.env.DEBUG;
             var active = envDebug ? chek_1.split(envDebug.trim().replace(/  +/g, ''), [',', ' ']) : [];
-            console.log(process.env.DEBUG_ONLY);
             if (!active.length)
                 this._activeDebuggers.push('default');
             else
@@ -116,44 +119,50 @@ var Timbr = /** @class */ (function (_super) {
      * Normalizes log levels ensuring error, exit and debug levels as well as styles.
      */
     Timbr.prototype.normalizeLevels = function () {
+        var levelDefaults = {
+            styles: null,
+            symbol: null,
+            symbolPos: 'after',
+            symbolStyles: null,
+            padding: this.options.padding,
+            timestamp: this.options.timestamp,
+            miniStack: this.options.miniStack,
+            indent: ''
+        };
         for (var k in this._levels) {
             if (!chek_1.isPlainObject(this._levels[k])) {
-                var level_1 = this._levels[k];
-                level_1 = {
-                    label: k,
-                    styles: chek_1.toArray(level_1, []),
-                    symbol: null,
-                    symbolPos: 'after',
-                    symbolStyles: []
-                };
-                this._levels[k] = level_1;
+                var level = this._levels[k];
+                this._levels[k] = chek_1.extend({}, levelDefaults, { label: k, styles: chek_1.toArray(level) });
             }
             else {
-                var lvl = this._levels[k];
-                lvl.label = lvl.label !== null ? lvl.label || k : null;
-                lvl.styles = chek_1.toArray(lvl.styles, []);
-                lvl.symbol = lvl.symbol || null;
-                lvl.symbolPos = lvl.symbolPos || 'after';
-                lvl.symbolStyles = lvl.symbolStyles;
+                var level = this._levels[k];
+                // Extend with defaults.
+                level = chek_1.extend({}, levelDefaults, level);
+                // Ensure label if not disabled.
+                level.label = !chek_1.isValue(level.label) ? k : level.label;
                 // Check if known symbol.
-                if (SYMBOLS[lvl.symbol])
-                    lvl.symbol = SYMBOLS[lvl.symbol];
-                if ((lvl.symbolStyles !== null || !lvl.symbolStyles.length) && lvl.styles)
-                    lvl.symbolStyles = lvl.styles;
-                this._levels[k] = lvl;
+                if (level.symbol && SYMBOLS[level.symbol])
+                    level.symbol = SYMBOLS[level.symbol];
+                // Fallback to level styles if symbol styles not defined.
+                if ((level.symbolStyles && !level.symbolStyles.length) || chek_1.isUndefined(level.symbolStyles))
+                    level.symbolStyles = level.styles;
+                if (chek_1.isNumber(level.indent))
+                    level.indent = ' '.repeat(level.indent);
+                // Update the level.
+                this._levels[k] = level;
             }
         }
         var levelKeys = this._levelKeys;
-        var level = this.options.level;
+        var activeLevel = this.options.level;
         var errorLevel = this.options.errorLevel;
         // Ensure a default log level.
-        var tmpLevel = level;
-        if (chek_1.isNumber(level))
-            tmpLevel = levelKeys[level] || 'info';
+        var tmpLevel = activeLevel;
+        if (chek_1.isNumber(activeLevel))
+            tmpLevel = levelKeys[activeLevel] || 'info';
         // ensure a level, if none select last.
         if (!~levelKeys.indexOf(tmpLevel))
             tmpLevel = chek_1.last(levelKeys);
-        level = this.options.level = tmpLevel;
+        activeLevel = this.options.level = tmpLevel;
         // ensure error level
         if (!~levelKeys.indexOf(errorLevel))
             this.options.errorLevel = chek_1.first(this._levelKeys);
@@ -174,18 +183,6 @@ var Timbr = /** @class */ (function (_super) {
      */
     Timbr.prototype.getIndex = function (level) {
         return this._levelKeys.indexOf(level);
-    };
-    /**
-     * Colorize
-     * Applies ansi styles to value.
-     *
-     * @param val the value to be colorized.
-     * @param styles the styles to be applied.
-     */
-    Timbr.prototype.colorize = function (val, styles) {
-        if (!styles || !styles.length)
-            return val;
-        return colurs.applyAnsi(val, styles);
     };
     /**
      * Parse Stack
@@ -253,7 +250,9 @@ var Timbr = /** @class */ (function (_super) {
      * @param format the format to return.
      */
     Timbr.prototype.getTimestamp = function (format) {
-        format = format || this.options.timestamp;
+        format = !chek_1.isValue(format) ? this.options.timestamp : format;
+        if (!format)
+            return null;
         var date = new Date();
         var dt = date.toLocaleString(this.options.timestampLocale, { timeZone: this.options.timestampTimezone, hour12: false });
         var result;
@@ -311,8 +310,8 @@ var Timbr = /** @class */ (function (_super) {
      * @param type the log level type.
      * @param offset additional offset.
      */
-    Timbr.prototype.pad = function (type, offset) {
-        if (!this.options.padLevels)
+    Timbr.prototype.pad = function (type, offset, group) {
+        if (!this.options.padding)
             return '';
         var max = 0;
         var len = type.length;
@@ -328,10 +327,11 @@ var Timbr = /** @class */ (function (_super) {
         var levels = [];
         for (var k in this._levels) {
             var level = this._levels[k];
-            if (level.label !== null)
+            if (level.label)
                 levels.push(level.label);
         }
-        levels = levels.concat(debugLevels);
+        if (!group)
+            levels = levels.concat(debugLevels);
         i = levels.length;
         while (i--) {
             var diff = levels[i].length - len;
@@ -370,6 +370,18 @@ var Timbr = /** @class */ (function (_super) {
         }
         if (toggleExceptionHandler)
             this.toggleExceptionHandler(this.options.errorCapture);
+    };
+    /**
+     * Colorize
+     * Applies ansi styles to value.
+     *
+     * @param val the value to be colorized.
+     * @param styles the styles to be applied.
+     */
+    Timbr.prototype.colorize = function (val, styles) {
+        if (!styles || !styles.length)
+            return val;
+        return colurs.applyAnsi(val, styles);
     };
     /**
      * Debugger
@@ -413,9 +425,14 @@ var Timbr = /** @class */ (function (_super) {
         };
         debug.namespace = namespace;
         debug.styles = options.styles;
-        debug.symbol = options.symbol || null;
+        debug.symbol = options.symbol || false;
         debug.symbolPos = options.symbolPos || 'after';
-        debug.symbolStyles = options.symbolStyles !== null ? options.symbolStyles || debug.styles || [] : null;
+        debug.symbolStyles = options.symbolStyles;
+        debug.miniStack = options.miniStack;
+        debug.timestamp = options.timestamp;
+        debug.indent = options.indent;
+        if (chek_1.isUndefined(debug.symbolStyles) || (debug.symbolStyles && !debug.symbolStyles.length))
+            debug.symbolStyles = debug.styles;
         debug.enabled = self.debuggers.enabled.bind(self, namespace);
         debug.enable = self.debuggers.enable.bind(self, namespace);
         debug.disable = self.debuggers.disable.bind(self, namespace);
@@ -530,6 +547,7 @@ var Timbr = /** @class */ (function (_super) {
         }
         var baseType = type || '';
         var clone = args.slice(0);
+        clone[0] = clone[0] || '';
         var subTypes = baseType.split(':');
         baseType = subTypes.length ? subTypes.shift() : null;
         var knownType = chek_1.contains(this._levelKeys, baseType);
@@ -561,31 +579,37 @@ var Timbr = /** @class */ (function (_super) {
             fn = clone.pop();
             args.pop();
         }
-        // Check if last is metadata.
-        meta = chek_1.isPlainObject(chek_1.last(clone)) ? clone.pop() : null;
+        var tmpMeta = {};
+        // Shift first arg as message.
+        msg = clone.shift();
+        // Only metadata was logged.
+        if (chek_1.isPlainObject(msg)) {
+            tmpMeta = msg;
+            msg = '';
+        }
+        // Inspect for formatters.
+        var fmtrs = (chek_1.isString(msg) && msg.match(/(%s|%d|%j|%%)/g)) || [];
+        var fmtArgs = clone.slice(0, fmtrs.length);
+        var suffixArgs = clone.slice(fmtrs.length);
         // Check if first arge is an Error.
-        err = chek_1.isError(chek_1.first(clone)) ? clone.shift() : null;
+        err = chek_1.isError(msg) ? msg : null;
         // Get stacktrace from error or fake it.
         stack = err ?
             this.parseStack(err.stack, prune) :
             this.parseStack((new Error('get stack')).stack, pruneGen);
-        // Format the message.
-        if (clone.length) {
-            if (clone.length > 1) {
-                if (/(%s|%d|%i|%f|%j|%o|%O|%%)/g.test(clone[0])) {
-                    msg = util_1.format(clone[0], clone.slice(1));
-                }
-                else {
-                    msg = clone.join(' ');
-                }
-            }
-            else {
-                msg = clone[0];
-            }
-        }
-        else {
-            msg = '';
-        }
+        // Check if message should be formatted.
+        if (fmtArgs.length)
+            msg = util_1.format.apply(void 0, [msg].concat(fmtArgs));
+        // Inspect suffix args for metadata.
+        suffixArgs.forEach(function (v, i) {
+            if (chek_1.isPlainObject(v))
+                tmpMeta = Object.assign(tmpMeta, v);
+        });
+        suffixArgs = suffixArgs.filter(function (v) { return !chek_1.isPlainObject(v); });
+        if (suffixArgs.length)
+            msg += (' ' + suffixArgs.join(' '));
+        // Check if last is metadata.
+        meta = !chek_1.isEmpty(tmpMeta) ? tmpMeta : null;
         if (err) {
             var origMsg = msg;
             if (this.options.stackTrace)
@@ -604,7 +628,7 @@ var Timbr = /** @class */ (function (_super) {
             index: idx,
             activeIndex: activeIdx,
             message: msg,
-            timestamp: this.getTimestamp(),
+            timestamp: this.getTimestamp(level && level.timestamp),
             meta: meta,
             args: args,
             error: err || null,
@@ -614,17 +638,20 @@ var Timbr = /** @class */ (function (_super) {
         var compiled = [];
         // Ignore for write, writeLn and log levels.
         if (!/^write/.test(baseType) && baseType !== 'log') {
+            // Check for indent.
+            if (level.indent && level.indent.length)
+                compiled.push(level.indent);
             // Add timestamp.
-            if (this.options.timestamp)
+            if (this.options.timestamp && event.timestamp)
                 compiled.push(this.colorize("[" + event.timestamp + "]", this.options.timestampStyles));
             // Add log level label.
-            if (this.options.labelLevels && event.type) {
+            if (level.label && event.type) {
                 var label = level.label;
                 var padding = '';
                 if (label === 'debug:default')
                     label = 'debug';
-                if (this.options.padLevels)
-                    padding = this.pad(label || '');
+                if (level.padding)
+                    padding = this.pad(label || '', null, level.group);
                 if (label && label.length) {
                     label = this.colorize(padding + label + ':', level.styles);
                     compiled.push(label);
@@ -638,7 +665,7 @@ var Timbr = /** @class */ (function (_super) {
             if (event.meta)
                 compiled.push(util_1.inspect(event.meta, { colors: this.options.colorize }));
             // Add ministack if not error.
-            if (this.options.miniStack) {
+            if (level.miniStack) {
                 if (!event.error || (event.error && !this.options.stackTrace))
                     compiled.push(this.colorize(event.stack.miniStack, 'gray'));
             }
@@ -647,7 +674,12 @@ var Timbr = /** @class */ (function (_super) {
                 compiled.push(this.colorize(level.symbol, level.symbolStyles));
         }
         else {
-            compiled = [event.message];
+            // Push message if has value.
+            if (event.message && event.message.length)
+                compiled.push(event.message);
+            // Add metadata.
+            if (event.meta)
+                compiled.push(util_1.inspect(event.meta, { colors: this.options.colorize }));
         }
         event.compiled = compiled;
         // Check for user defined before write method after compiling.

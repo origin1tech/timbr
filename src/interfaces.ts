@@ -23,15 +23,18 @@ export interface IMap<T> {
 }
 
 export interface ITimbrLevelBase {
+  label?: string | false;
   styles?: string | string[];
-  symbol?: string | TimbrSymbols;
-  symbolPos?: string;
+  symbol?: string | TimbrSymbols | false;
+  symbolPos?: 'before' | 'after';
   symbolStyles?: string | string[];
+  padding?: boolean;
+  timestamp?: TimestampFormat;
+  miniStack?: boolean;
+  indent?: string | number;
 }
 
-export interface ITimbrLevel extends ITimbrLevelBase {
-  label?: string;
-}
+export interface ITimbrLevel extends ITimbrLevelBase { }
 
 export interface ITimbrLevels extends IMap<string | string[] | ITimbrLevel> { }
 
@@ -100,8 +103,8 @@ export interface ITimbrOptions {
   stream?: NodeJS.WritableStream;
   level?: string | number;
   colorize?: boolean;
-  labelLevels?: boolean;
-  padLevels?: boolean;
+  labels?: boolean;
+  padding?: boolean;
   timestamp?: TimestampFormat;
   timestampStyles?: AnsiStyles | AnsiStyles[];
   timestampLocale?: string;

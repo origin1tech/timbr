@@ -1,6 +1,6 @@
 # Timbr
 
-Minimalistic logger that accepts custom stream and supports event emitter. Timbr includes handy default debug method as well as ability to create custom deuggers by type.
+Logger that supports custom stream, events, handy helper methods and built in debugger creation.
 
 ## Installation
 
@@ -21,7 +21,6 @@ Require or import
 ```ts
 import * as timbr from 'timbr';
 const log = timbr.init({ /* your options here */ })
-log.info('some message.');
 ```
 
 OR
@@ -43,23 +42,39 @@ const LOG_LEVELS = {
   notice: 'green',
   info: 'blue'
 }
-// NOTE: the below "LogLevelKeys" can be omitted
-// when NOT using Typescript. You may also omit
-// <LogLevelKeys> in the create method when NOT
-// using Typescript.
 
 const LogLevelKeys = keyof typeof LOG_LEVELS;
 const log = timbr.create<LogLevelKeys>({ /* your options */}, methods);
 
-log.warn('some warning.');
+// NOTE: When NOT using Typescript you can create your logger instance
+// by simply passing your options and log levels/methods (see below).
 
+const log = timbr.create({ /* options */}, methods);
+```
+
+#### Log a Message
+
+```ts
+log.warn('some warning.');
 ```
 
 ### Default Levels
 
 When calling the <code>.init()</code> method Timbr will initialize with the following default log levels:
 
-error, warn, info, trace, verbose
+error, warn, info, trace, verbose, debug
+
+**NOTE:** the "debug" method by default is a debugger. A debugger behaves much like a typical log level but emits its events to debug listeners instead of log.
+
+This behavior allows for simple debugging without additional libs or instantiating a debugger. Good for simple projects. If you need multiple debuggers, simply disable and create as many debuggers as needed. See [below](#Debuggers) for creating custom debuggers.
+
+You can change this behavior by setting "debugLevel" in options to another level or false to disable. This allows for custom methods WITHOUT a built in debug method.
+
+```ts
+const options = {
+  debugLevel: false
+};
+```
 
 ### Custom Levels
 
@@ -67,18 +82,23 @@ When initializing using the <code>.create()</code> method to create a custom ins
 
 ```ts
 const LOG_LEVELS = {
-  level_name: 'red'
+  info: 'blue'
 }
 
 // OR
 
 const LOG_LEVELS = {
-  level_name: {
-    label: 'optional label name or null to disable',
-    styles: 'string or string array of color styles.',
-    symbol: 'string or named known symbol',
-    symbolPos: 'before or after',
-    symbolStyles: 'string or string array of color styles'
+  info: ['bgBlue', 'white']
+}
+
+const LOG_LEVELS = {
+  info: {
+    label: 'information', // when null the key is used or false to disable label for this level.
+    styles: ['blue'] // string or array of string matching colurs styles.,
+    symbol: 'info' // a named known symbol or a string,
+    symbolPos: 'after' // or 'before',
+    symbolStyles: null // same as above 'styles',
+    indent: 10 // a number of spaces to indent or a string.
   }
 }
 ```
@@ -147,9 +167,9 @@ Timbr supports a few useful methods by default.
     <tr><td>Method</td><td>Description</td></tr>
   </thead>
   <tbody>
-    <tr><td>symbol</td><td>generates a symbol or gets known symbol.</td></tr>
     <tr><td>write</td><td>writes to output stream inline without line returns.</td></tr>
     <tr><td>writeLn</td><td>same as above but with line return.</td></tr>
+    <tr><td>symbol</td><td>generates a symbol or gets known symbol.</td></tr>
     <tr><td>exit</td><td>allows for exiting process ex: log.info().exit(code).</td></tr>
   </tbody>
 </table>
@@ -232,7 +252,6 @@ You can also set this in your initialization options using property "debugOnly".
 $ DEBUG_ONLY="true" node index.js
 ```
 
-
 ## Log Symbols
 
 To use symbols you can get a known symbol to Timbr and manually add it to your log message or
@@ -247,13 +266,25 @@ const warnSymbol = log.symbol('warn');
 log.warn('some message %s', warnSymbol);
 ```
 
-**In Log Level Options**
+**Symbol in Options**
+
+Known Symbols
+
+```ts
+const SYMBOLS = {
+  error: '✖',
+  warn: '⚠',
+  info: 'ℹ',
+  trace: '◎',
+  debug: '✱',
+  ok: '✔'
+};
+```
 
 ```ts
 const LOG_LEVELS = {
   warn: {
-    styles: 'yellow'
-    symbol: 'warn',
+    symbol: 'warn', // a known symbol name (see above) to Timbr or custom string.
     symbolPos: 'after', // (before or after, default is after)
     symbolStyles: undefined // (if undefined above "styles" used)
   }
@@ -264,7 +295,29 @@ const LOG_LEVELS = {
 
 Timbr extends Event Emitter allowing you to listen to log or debug events.
 
-**Any Log Event**
+#### Timbr Event Object
+
+Both event listeners and callbacks provide access to the TimbrEventData object which is created
+when log arguments are parsed.
+
+```ts
+const event = {
+  type: 'the primary type like error, warn, info etc',
+  subTypes: 'debug:server would result in sub types of ['server'],
+  level: 'this is the log level or debug configuration options',
+  index: 'the integer or index of the log level being logged',
+  activeIndex: 'the integer of the active level, what you passed in your init options as the active level',
+  message: msg, // this gets updated after compile.
+  timestamp: 'the current timestamp',
+  meta: 'any metadata or object that was passed in the log message',
+  args: 'array containing the original arguments.',
+  error: 'when an error is logged the error instance will be stored here',
+  stack: 'the stack trace for the message being logged when no error present a stack is generated'
+};
+```
+
+
+#### On Log
 
 ```ts
 log.on('log', (message, event) => {
@@ -272,10 +325,26 @@ log.on('log', (message, event) => {
 })
 ```
 
-**Info Log Events**
+// Or by type
 
 ```ts
 log.on('log:info', (message, event) => {
+  // do something
+})
+```
+
+#### On Debug
+
+```ts
+log.on('debug', (message, event) => {
+  // do something
+})
+```
+
+// Or by type
+
+```ts
+log.on('debug:default', (message, event) => {
   // do something
 })
 ```

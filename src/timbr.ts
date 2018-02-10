@@ -3,7 +3,7 @@
 import { EventEmitter } from 'events';
 import { relative, parse } from 'path';
 import { Colurs, IColurs } from 'colurs';
-import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone, isWindows, isEmpty, split } from 'chek';
+import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone, isWindows, isEmpty, split, isValue, isUndefined } from 'chek';
 import { IStacktraceFrame, IStacktraceResult, ITimbrEventData, ITimbrOptions, EventCallback, IMap, OptionKeys, AnsiStyles, ITimbrLevels, TimbrUnion, ITimbrLevel, ITimbr, TimestampCallback, ITimbrParsedEvent, TimestampFormat, ITimbrDebug, DebuggerOrNamespace, ITimbrDebugOptions } from './interfaces';
 import { format, inspect } from 'util';
 
@@ -27,7 +27,11 @@ export const LOG_LEVELS = {
   info: 'green',
   trace: 'cyan',
   verbose: 'magenta',
-  debug: 'blue'
+  debug: {
+    styles: 'blue',
+    indent: '     ',
+    timestamp: false
+  }
 };
 
 const DEBUG_DEFAULTS: ITimbrLevel = {
@@ -40,8 +44,8 @@ const DEFAULTS: ITimbrOptions = {
   stream: process.stderr, // the stream to output log messages to.
   level: 'info',          // the level the logger is current set at.
   colorize: true,         // whether or not to colorize output.
-  labelLevels: true,      // when true level label prefixes log message.
-  padLevels: true,        // when true levels are padded on the left.
+  labels: true,           // when true level label prefixes log message.
+  padding: true,          // when true levels are padded on the left.
   timestamp: 'time',      // timestamp format date, time or false.
   timestampStyles: null,  // Ansi styles for colorizing.
   timestampLocale: 'en-US', // The locale for timestamps.
@@ -135,47 +139,61 @@ export class Timbr extends EventEmitter {
    */
   private normalizeLevels() {
 
+    const levelDefaults = {
+      styles: null,
+      symbol: null,
+      symbolPos: 'after',
+      symbolStyles: null,
+      padding: this.options.padding,
+      timestamp: this.options.timestamp,
+      miniStack: this.options.miniStack,
+      indent: ''
+    };
+
     for (const k in this._levels) {
       if (!isPlainObject(this._levels[k])) {
         let level = this._levels[k];
-        level = {
-          label: k,
-          styles: toArray(level, []),
-          symbol: null,
-          symbolPos: 'after',
-          symbolStyles: []
-        };
-        this._levels[k] = level;
+        this._levels[k] = extend({}, levelDefaults, { label: k, styles: toArray(level) });
       }
       else {
-        const lvl = this._levels[k] as ITimbrLevel;
-        lvl.label = lvl.label !== null ? lvl.label || k : null;
-        lvl.styles = toArray(lvl.styles, []);
-        lvl.symbol = lvl.symbol || null;
-        lvl.symbolPos = lvl.symbolPos || 'after';
-        lvl.symbolStyles = lvl.symbolStyles;
+        let level = this._levels[k] as ITimbrLevel;
+
+        // Extend with defaults.
+        level = extend({}, levelDefaults, level);
+
+        // Ensure label if not disabled.
+        level.label = !isValue(level.label) ? k : level.label;
+
         // Check if known symbol.
-        if (SYMBOLS[lvl.symbol])
-          lvl.symbol = SYMBOLS[lvl.symbol];
-        if ((lvl.symbolStyles !== null || !lvl.symbolStyles.length) && lvl.styles)
-          lvl.symbolStyles = lvl.styles;
-        this._levels[k] = lvl;
+        if (level.symbol && SYMBOLS[level.symbol])
+          level.symbol = SYMBOLS[level.symbol];
+
+        // Fallback to level styles if symbol styles not defined.
+        if ((level.symbolStyles && !level.symbolStyles.length) || isUndefined(level.symbolStyles))
+          level.symbolStyles = level.styles;
+
+        if (isNumber(level.indent))
+          level.indent = ' '.repeat(level.indent as number);
+
+        // Update the level.
+        this._levels[k] = level;
+
       }
     }
 
     const levelKeys = this._levelKeys;
-    let level: any = this.options.level;
+    let activeLevel: any = this.options.level;
     const errorLevel = this.options.errorLevel;
 
     // Ensure a default log level.
-    let tmpLevel = level;
-    if (isNumber(level))
-      tmpLevel = levelKeys[level] || 'info';
+    let tmpLevel = activeLevel;
+    if (isNumber(activeLevel))
+      tmpLevel = levelKeys[activeLevel] || 'info';
 
     // ensure a level, if none select last.
     if (!~levelKeys.indexOf(tmpLevel))
       tmpLevel = last(levelKeys);
-    level = this.options.level = tmpLevel;
+    activeLevel = this.options.level = tmpLevel;
 
     // ensure error level
     if (!~levelKeys.indexOf(errorLevel))
@@ -200,19 +218,6 @@ export class Timbr extends EventEmitter {
    */
   private getIndex(level: any) {
     return this._levelKeys.indexOf(level);
-  }
-
-  /**
-   * Colorize
-   * Applies ansi styles to value.
-   *
-   * @param val the value to be colorized.
-   * @param styles the styles to be applied.
-   */
-  private colorize(val: any, styles: AnsiStyles | AnsiStyles[]) {
-    if (!styles || !styles.length)
-      return val;
-    return colurs.applyAnsi(val, styles);
   }
 
   /**
@@ -301,7 +306,10 @@ export class Timbr extends EventEmitter {
    */
   private getTimestamp(format?: TimestampFormat) {
 
-    format = format || this.options.timestamp;
+    format = !isValue(format) ? this.options.timestamp : format;
+
+    if (!format)
+      return null;
 
     const date = new Date();
     let dt: any = date.toLocaleString(this.options.timestampLocale, { timeZone: this.options.timestampTimezone, hour12: false });
@@ -373,9 +381,9 @@ export class Timbr extends EventEmitter {
    * @param type the log level type.
    * @param offset additional offset.
    */
-  private pad(type: string, offset?: number | string) {
+  private pad(type: string, offset?: number | string, group?: string) {
 
-    if (!this.options.padLevels)
+    if (!this.options.padding)
       return '';
 
     let max = 0;
@@ -395,11 +403,12 @@ export class Timbr extends EventEmitter {
 
     for (const k in this._levels) {
       const level = this._levels[k] as ITimbrLevel;
-      if (level.label !== null)
+      if (level.label)
         levels.push(level.label);
     }
 
-    levels = levels.concat(debugLevels);
+    if (!group)
+      levels = levels.concat(debugLevels);
 
     i = levels.length;
 
@@ -444,6 +453,19 @@ export class Timbr extends EventEmitter {
     }
     if (toggleExceptionHandler)
       this.toggleExceptionHandler(this.options.errorCapture);
+  }
+
+  /**
+   * Colorize
+   * Applies ansi styles to value.
+   *
+   * @param val the value to be colorized.
+   * @param styles the styles to be applied.
+   */
+  colorize(val: any, styles: AnsiStyles | AnsiStyles[]) {
+    if (!styles || !styles.length)
+      return val;
+    return colurs.applyAnsi(val, styles);
   }
 
   /**
@@ -517,9 +539,15 @@ export class Timbr extends EventEmitter {
 
     debug.namespace = namespace;
     debug.styles = options.styles;
-    debug.symbol = options.symbol || null;
+    debug.symbol = options.symbol || false;
     debug.symbolPos = options.symbolPos || 'after';
-    debug.symbolStyles = options.symbolStyles !== null ? options.symbolStyles || debug.styles || [] : null;
+    debug.symbolStyles = options.symbolStyles;
+    debug.miniStack = options.miniStack;
+    debug.timestamp = options.timestamp;
+    debug.indent = options.indent;
+
+    if (isUndefined(debug.symbolStyles) || (debug.symbolStyles && !debug.symbolStyles.length))
+      debug.symbolStyles = debug.styles;
 
     debug.enabled = self.debuggers.enabled.bind(self, namespace);
     debug.enable = self.debuggers.enable.bind(self, namespace);
@@ -644,7 +672,8 @@ export class Timbr extends EventEmitter {
 
     let baseType = type || '';
 
-    const clone = args.slice(0);
+    let clone = args.slice(0);
+    clone[0] = clone[0] || '';
     const subTypes = baseType.split(':');
     baseType = subTypes.length ? subTypes.shift() : null;
     const knownType = contains(this._levelKeys, baseType);
@@ -684,34 +713,47 @@ export class Timbr extends EventEmitter {
       args.pop();
     }
 
-    // Check if last is metadata.
-    meta = isPlainObject(last(clone)) ? clone.pop() : null;
+    let tmpMeta: any = {};
+
+    // Shift first arg as message.
+    msg = clone.shift();
+
+    // Only metadata was logged.
+    if (isPlainObject(msg)) {
+      tmpMeta = msg;
+      msg = '';
+    }
+
+    // Inspect for formatters.
+    const fmtrs = (isString(msg) && msg.match(/(%s|%d|%j|%%)/g)) || [];
+    const fmtArgs = clone.slice(0, fmtrs.length);
+    let suffixArgs = clone.slice(fmtrs.length);
 
     // Check if first arge is an Error.
-    err = isError(first(clone)) ? clone.shift() : null;
+    err = isError(msg) ? msg : null;
 
     // Get stacktrace from error or fake it.
     stack = err ?
       this.parseStack(err.stack, prune) :
       this.parseStack((new Error('get stack')).stack, pruneGen);
 
-    // Format the message.
-    if (clone.length) {
-      if (clone.length > 1) {
-        if (/(%s|%d|%i|%f|%j|%o|%O|%%)/g.test(clone[0])) {
-          msg = format(clone[0], clone.slice(1));
-        }
-        else {
-          msg = clone.join(' ');
-        }
-      }
-      else {
-        msg = clone[0];
-      }
-    }
-    else {
-      msg = '';
-    }
+    // Check if message should be formatted.
+    if (fmtArgs.length)
+      msg = format(msg, ...fmtArgs);
+
+    // Inspect suffix args for metadata.
+
+    suffixArgs.forEach((v, i) => {
+      if (isPlainObject(v))
+        tmpMeta = Object.assign(tmpMeta, v);
+    });
+    suffixArgs = suffixArgs.filter(v => !isPlainObject(v));
+
+    if (suffixArgs.length)
+      msg += (' ' + suffixArgs.join(' '));
+
+    // Check if last is metadata.
+    meta = !isEmpty(tmpMeta) ? tmpMeta : null;
 
     if (err) {
       const origMsg = msg;
@@ -732,7 +774,7 @@ export class Timbr extends EventEmitter {
       index: idx,
       activeIndex: activeIdx,
       message: msg, // this gets updated after compile.
-      timestamp: this.getTimestamp(),
+      timestamp: this.getTimestamp(level && level.timestamp),
       meta: meta,
       args: args,
       error: err || null,
@@ -745,18 +787,22 @@ export class Timbr extends EventEmitter {
     // Ignore for write, writeLn and log levels.
     if (!/^write/.test(baseType) && baseType !== 'log') {
 
+      // Check for indent.
+      if (level.indent && level.indent.length)
+        compiled.push(level.indent);
+
       // Add timestamp.
-      if (this.options.timestamp)
+      if (this.options.timestamp && event.timestamp)
         compiled.push(this.colorize(`[${event.timestamp}]`, this.options.timestampStyles));
 
       // Add log level label.
-      if (this.options.labelLevels && event.type) {
+      if (level.label && event.type) {
         let label = level.label;
         let padding = '';
         if (label === 'debug:default')
           label = 'debug';
-        if (this.options.padLevels)
-          padding = this.pad(label || '');
+        if (level.padding)
+          padding = this.pad(label || '', null, level.group);
         if (label && label.length) {
           label = this.colorize(padding + label + ':', level.styles as AnsiStyles[]);
           compiled.push(label);
@@ -774,7 +820,7 @@ export class Timbr extends EventEmitter {
         compiled.push(inspect(event.meta, { colors: this.options.colorize }));
 
       // Add ministack if not error.
-      if (this.options.miniStack) {
+      if (level.miniStack) {
         if (!event.error || (event.error && !this.options.stackTrace))
           compiled.push(this.colorize(event.stack.miniStack, 'gray'));
       }
@@ -785,7 +831,15 @@ export class Timbr extends EventEmitter {
 
     }
     else {
-      compiled = [event.message];
+
+      // Push message if has value.
+      if (event.message && event.message.length)
+        compiled.push(event.message);
+
+      // Add metadata.
+      if (event.meta)
+        compiled.push(inspect(event.meta, { colors: this.options.colorize }));
+
     }
 
     event.compiled = compiled;
@@ -921,6 +975,6 @@ export function create<L extends string>(options?: ITimbrOptions, levels?: ITimb
 
 // Inits a default instance.
 export function init(options?: ITimbrOptions): TimbrUnion<LogLevelKeys> {
-  return create<LogLevelKeys>(options, LOG_LEVELS);
+  return create<LogLevelKeys>(options, LOG_LEVELS as ITimbrLevels);
 }
 
