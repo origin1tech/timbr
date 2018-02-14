@@ -56,6 +56,7 @@ var DEFAULTS = {
     errorExit: false,
     errorConvert: false,
     errorCapture: false,
+    errorCaptureExit: true,
     errorConstruct: false,
     stackTrace: true,
     stackDepth: 0,
@@ -289,7 +290,8 @@ var Timbr = /** @class */ (function (_super) {
         // Disable to prevent loops will exit after catching.
         this.toggleExceptionHandler(false);
         this.logger(errorLevel, err);
-        process.exit(1);
+        if (this.options.errorCaptureExit)
+            process.exit(1);
     };
     /**
      * Toggle Exception Handler

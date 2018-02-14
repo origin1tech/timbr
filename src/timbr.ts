@@ -54,6 +54,7 @@ const DEFAULTS: ITimbrOptions = {
   errorExit: false,       // exit on error level.
   errorConvert: false,    // when true converts to error level when Error is detected.
   errorCapture: false,    // whether or not to capture uncaught errors.
+  errorCaptureExit: true, // whether to exit on captured uncaught exceptions.
   errorConstruct: false,  // convert string msg to instanceof Error for error level.
   stackTrace: true,       // whether or not to display full stack trace for errors.
   stackDepth: 0,          // the depth of stack traces results 0 for full stack.
@@ -358,7 +359,8 @@ export class Timbr extends EventEmitter {
     // Disable to prevent loops will exit after catching.
     this.toggleExceptionHandler(false);
     this.logger(errorLevel, err);
-    process.exit(1);
+    if (this.options.errorCaptureExit)
+      process.exit(1);
   }
 
   /**

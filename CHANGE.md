@@ -2,9 +2,10 @@
 
 List of changes by date/version.
 
-### 2.5.2018 (2.0.0)
+### 2.5.2018 (2.0.0 - 2.0.1)
 
 <table>
+  <tr><td>options.errorCaptureExit</td><td>add option to toggle exit on uncaught errors.</td></tr>
   <tr><td>init</td><td>add method to create default log level/methods with options.</td></tr>
   <tr><td>options.debuggers</td><td>remove from options in favor of just instantiating.</td></tr>
   <tr><td>options.timestamp</td><td>all passing function for custom timestamp.</td></tr>

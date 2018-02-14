@@ -93,6 +93,7 @@ export interface ITimbrOptions {
     timestampLocale?: string;
     timestampTimezone?: string;
     errorCapture?: boolean;
+    errorCaptureExit?: boolean;
     errorLevel?: string;
     errorExit?: boolean;
     errorConvert?: boolean;
