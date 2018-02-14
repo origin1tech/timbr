@@ -24,6 +24,8 @@ export interface ITimbrLevelBase {
     timestamp?: TimestampFormat;
     miniStack?: boolean;
     indent?: string | number;
+    contentSytles?: AnsiStyles | AnsiStyles[];
+    elapsedTime?: boolean;
 }
 export interface ITimbrLevel extends ITimbrLevelBase {
 }
@@ -33,15 +35,14 @@ export interface ITimbr<L extends string> extends Timbr {
     (...args: any[]): TimbrUnion<L>;
 }
 export interface ITimbrEventData {
-    type: string;
-    subTypes: string[];
-    index: number;
-    activeIndex: number;
-    level: ITimbrLevel | ITimbrDebug;
-    timestamp: string | number | Date;
-    message: string;
-    meta: IMap<any>;
-    args: any[];
+    type?: string;
+    index?: number;
+    activeIndex?: number;
+    level?: ITimbrLevel | ITimbrDebug;
+    timestamp?: string | number | Date;
+    message?: string;
+    meta?: IMap<any>;
+    args?: any[];
     error?: Error;
     stack?: IStacktraceResult;
     compiled?: any[];
@@ -57,9 +58,9 @@ export interface IStacktraceFrame {
     column: number;
 }
 export interface IStacktraceResult {
-    stackFrames: IStacktraceFrame[];
-    stackTrace: string[];
-    miniStack: string;
+    stackFrames?: IStacktraceFrame[];
+    stackTrace?: string[];
+    miniStack?: string;
 }
 export interface ITimbrSymbols {
     error: string;
@@ -88,6 +89,7 @@ export interface ITimbrOptions {
     colorize?: boolean;
     labels?: boolean;
     padding?: boolean;
+    prettyMeta?: boolean;
     timestamp?: TimestampFormat;
     timestampStyles?: AnsiStyles | AnsiStyles[];
     timestampLocale?: string;
@@ -103,5 +105,6 @@ export interface ITimbrOptions {
     miniStack?: boolean;
     debugLevel?: string | false;
     debugOnly?: boolean;
+    debugElapsed?: boolean;
     beforeWrite?: BeforeWrite;
 }

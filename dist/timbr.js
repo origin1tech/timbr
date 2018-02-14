@@ -13,6 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var events_1 = require("events");
 var path_1 = require("path");
 var colurs_1 = require("colurs");
+var stringifyObj = require("stringify-object");
 var chek_1 = require("chek");
 var util_1 = require("util");
 var IS_SYMBOLS_SUPPORTED = !chek_1.isWindows() || process.env.VSCODE_PID || process.env.CI;
@@ -27,6 +28,18 @@ var SYMBOLS = {
     debug: IS_SYMBOLS_SUPPORTED ? '✱' : '*',
     ok: IS_SYMBOLS_SUPPORTED ? '✔' : '√'
 };
+var PRETTIFY_COLORS = {
+    number: 'yellow',
+    integer: 'yellow',
+    float: 'yellow',
+    boolean: 'yellow',
+    string: 'green',
+    date: 'magenta',
+    regexp: 'red',
+    null: 'bold',
+    undefined: 'gray',
+    function: 'cyan'
+};
 exports.LOG_LEVELS = {
     error: ['bold', 'red'],
     warn: 'yellow',
@@ -39,15 +52,13 @@ exports.LOG_LEVELS = {
         timestamp: false
     }
 };
-var DEBUG_DEFAULTS = {
-    styles: 'blue'
-};
 var DEFAULTS = {
     stream: process.stderr,
     level: 'info',
     colorize: true,
     labels: true,
     padding: true,
+    prettyMeta: false,
     timestamp: 'time',
     timestampStyles: null,
     timestampLocale: 'en-US',
@@ -63,6 +74,7 @@ var DEFAULTS = {
     miniStack: false,
     debugLevel: 'debug',
     debugOnly: false,
+    debugElapsed: true,
     beforeWrite: null // Called before writing to stream for customizing output.
 };
 var Timbr = /** @class */ (function (_super) {
@@ -101,7 +113,7 @@ var Timbr = /** @class */ (function (_super) {
                 this._activeDebuggers.push('default');
             else
                 this._activeDebuggers = active;
-            if (process.env.DEBUG_ONLY)
+            if (process.env.DEBUG_ONLY === 'true')
                 this.options.debugOnly = true;
         }
         // Init methods.
@@ -128,7 +140,9 @@ var Timbr = /** @class */ (function (_super) {
             padding: this.options.padding,
             timestamp: this.options.timestamp,
             miniStack: this.options.miniStack,
-            indent: ''
+            indent: '',
+            contentStyles: null,
+            elapsedTime: true
         };
         for (var k in this._levels) {
             if (!chek_1.isPlainObject(this._levels[k])) {
@@ -312,7 +326,7 @@ var Timbr = /** @class */ (function (_super) {
      * @param type the log level type.
      * @param offset additional offset.
      */
-    Timbr.prototype.pad = function (type, offset, group) {
+    Timbr.prototype.pad = function (type, offset) {
         if (!this.options.padding)
             return '';
         var max = 0;
@@ -324,7 +338,7 @@ var Timbr = /** @class */ (function (_super) {
         var debugLevels = (this._activeDebuggers || []).map(function (l) {
             if (l === 'default')
                 return 'debug';
-            return "debug:" + l;
+            return l;
         });
         var levels = [];
         for (var k in this._levels) {
@@ -332,8 +346,6 @@ var Timbr = /** @class */ (function (_super) {
             if (level.label)
                 levels.push(level.label);
         }
-        if (!group)
-            levels = levels.concat(debugLevels);
         i = levels.length;
         while (i--) {
             var diff = levels[i].length - len;
@@ -342,6 +354,39 @@ var Timbr = /** @class */ (function (_super) {
                 padding = ' '.repeat(diff + offset);
         }
         return padding;
+    };
+    /**
+     * Prettify Object
+     * Formats an object for display in terminal.
+     *
+     * @param obj the object to be prettified.
+     */
+    Timbr.prototype.prettifyObject = function (obj, padding) {
+        var self = this;
+        var colorKeys = chek_1.keys(PRETTIFY_COLORS);
+        function transform(obj, prop, orig) {
+            var val = obj[prop];
+            var typed = chek_1.getType(val);
+            if (~colorKeys.indexOf(typed)) {
+                var color = PRETTIFY_COLORS[typed];
+                return self.colorize(val, color);
+            }
+            else {
+                return orig;
+            }
+        }
+        var result = stringifyObj(obj, {
+            indent: '  ',
+            transform: transform
+        });
+        if (padding) {
+            var pad_1 = this.pad('', 2);
+            result = result
+                .split('\n')
+                .map(function (v) { return pad_1 + v; })
+                .join('\n');
+        }
+        return result;
     };
     /**
      * Get
@@ -394,51 +439,83 @@ var Timbr = /** @class */ (function (_super) {
      */
     Timbr.prototype.debugger = function (namespace, options) {
         var self = this;
-        var previous;
+        var previous, debug;
         if (chek_1.isPlainObject(namespace)) {
             options = namespace;
             namespace = undefined;
         }
         namespace = namespace || 'default';
+        var DEBUG_DEFAULTS = {
+            label: namespace,
+            styles: 'blue',
+            symbol: false,
+            symbolPos: 'after',
+            symbolStyles: null,
+            padding: this.options.padding,
+            timestamp: this.options.timestamp,
+            miniStack: this.options.miniStack,
+            indent: '',
+            contentStyles: null,
+            elapsedTime: this.options.debugElapsed
+        };
         // Check if debugger exists.
         if (this._debuggers[namespace])
             return this._debuggers[namespace];
         options = chek_1.extend({}, DEBUG_DEFAULTS, options);
-        var debug = function () {
+        debug = function () {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
                 args[_i] = arguments[_i];
             }
-            if (!chek_1.isDebug() || !~self._activeDebuggers.indexOf(namespace))
+            if (!chek_1.isDebug() || (!~self._activeDebuggers.indexOf(namespace) && !~self._activeDebuggers.indexOf('*')))
                 return self;
             var current = +new Date();
             var elapsed = current - (previous || current);
-            debug.previous = previous;
-            debug.current = current;
-            debug.elasped = elapsed;
+            debug.set('previous', previous);
+            debug.set('current', current);
+            debug.set('elapsed', elapsed);
             previous = current;
-            var event = self.parse.apply(self, ["debug:" + namespace].concat(args));
+            var event = self.parse.apply(self, ["debug:" + debug.namespace].concat(args));
             var msg = event.compiled.join(' ');
-            self.options.stream.write(msg + self.colorize(" (" + elapsed + "ms)", debug.styles) + EOL);
+            // let elapsedTimeStr = self.colorize(`(${elapsed}ms)`, debug.styles);
+            // const compiled = [msg];
+            // if (debug.elapsedTime)
+            //   compiled.push(elapsedTimeStr);
+            // msg = compiled.join(' ');
+            // If content styles strip and colorize
+            if (debug.contentStyles && debug.contentStyles.length) {
+                msg = colurs.strip(msg);
+                msg = self.colorize(msg, debug.contentStyles);
+            }
+            // Write the message.
+            self.options.stream.write(msg + EOL);
             self.emit('debug', event.message, event);
-            self.emit("" + event.type, event.message, event);
+            self.emit("debug:" + event.type, event.message, event);
             event.fn(event.message, event);
             return self;
         };
         debug.namespace = namespace;
         debug.styles = options.styles;
-        debug.symbol = options.symbol || false;
-        debug.symbolPos = options.symbolPos || 'after';
+        debug.symbol = options.symbol;
+        debug.symbolPos = options.symbolPos;
         debug.symbolStyles = options.symbolStyles;
         debug.miniStack = options.miniStack;
         debug.timestamp = options.timestamp;
         debug.indent = options.indent;
+        debug.label = options.label;
+        debug.padding = options.padding;
+        debug.contentStyles = options.contentSytles;
+        debug.elapsedTime = options.elapsedTime;
         if (chek_1.isUndefined(debug.symbolStyles) || (debug.symbolStyles && !debug.symbolStyles.length))
             debug.symbolStyles = debug.styles;
+        debug.elapsed = 0;
+        debug.current = 0;
+        debug.previous = 0;
         debug.enabled = self.debuggers.enabled.bind(self, namespace);
         debug.enable = self.debuggers.enable.bind(self, namespace);
         debug.disable = self.debuggers.disable.bind(self, namespace);
         debug.destroy = self.debuggers.destroy.bind(self, namespace);
+        debug.set = self.debuggers.set.bind(self, namespace);
         // Add to collection.
         this._debuggers[namespace] = debug;
         return debug;
@@ -460,6 +537,16 @@ var Timbr = /** @class */ (function (_super) {
                 get: function (namespace) {
                     var ns = toNamespace(namespace);
                     return _this._debuggers[ns];
+                },
+                /**
+                 * Set
+                 * Sets a value on an existing debugger.
+                 */
+                set: function (namespace, key, val) {
+                    var ns = toNamespace(namespace);
+                    if (_this._debuggers[ns])
+                        _this._debuggers[ns][key] = val;
+                    return methods;
                 },
                 /**
                  * Get All
@@ -553,10 +640,10 @@ var Timbr = /** @class */ (function (_super) {
         var subTypes = baseType.split(':');
         baseType = subTypes.length ? subTypes.shift() : null;
         var knownType = chek_1.contains(this._levelKeys, baseType);
-        var debugr = baseType === 'debug' ? this.debuggers.get(subTypes[0]) : null;
-        var stack;
+        var debugr = baseType === 'debug' ? this.debuggers.get(subTypes.join(':')) : null;
+        var stack = {};
         var err, meta, ts, msg;
-        var event;
+        var event = {};
         var fn = chek_1.noop;
         var prune = 0;
         var pruneGen = debugr ? 2 : 2;
@@ -573,9 +660,6 @@ var Timbr = /** @class */ (function (_super) {
         var level = debugr ? debugr : this._levels[baseType] || null;
         var idx = this.getIndex(type);
         var activeIdx = this.getIndex(this.options.level);
-        // When debug ensure label is the type.
-        if (debugr)
-            level.label = type;
         // Check if last is callback.
         if (chek_1.isFunction(chek_1.last(clone))) {
             fn = clone.pop();
@@ -625,7 +709,6 @@ var Timbr = /** @class */ (function (_super) {
         }
         event = {
             type: type,
-            subTypes: subTypes,
             level: level,
             index: idx,
             activeIndex: activeIdx,
@@ -638,6 +721,18 @@ var Timbr = /** @class */ (function (_super) {
             fn: fn
         };
         var compiled = [];
+        var metaStyled, elapsedStyled;
+        // Style metadata.
+        if (meta) {
+            if (!this.options.prettyMeta)
+                metaStyled = util_1.inspect(meta, { colors: this.options.colorize });
+            else
+                metaStyled = this.prettifyObject(meta, level.padding);
+        }
+        // Styled debug elapsed time.
+        if (debugr) {
+            elapsedStyled = this.colorize("(" + debugr.elapsed + "ms)", debugr.styles);
+        }
         // Ignore for write, writeLn and log levels.
         if (!/^write/.test(baseType) && baseType !== 'log') {
             // Check for indent.
@@ -650,38 +745,50 @@ var Timbr = /** @class */ (function (_super) {
             if (level.label && event.type) {
                 var label = level.label;
                 var padding = '';
-                if (label === 'debug:default')
+                if (debugr && label === 'default')
                     label = 'debug';
                 if (level.padding)
-                    padding = this.pad(label || '', null, level.group);
+                    padding = this.pad(label || '', null);
                 if (label && label.length) {
                     label = this.colorize(padding + label + ':', level.styles);
                     compiled.push(label);
                 }
+            }
+            else {
+                // need to offset if using labels.
+                var offset = this.options.labels ? 1 : 0;
+                if (level.padding)
+                    compiled.push(this.pad('', offset));
             }
             // Check for Symbol.
             if (level && level.symbol && level.symbolPos === 'before')
                 compiled.push(this.colorize(level.symbol, level.symbolStyles));
             compiled.push(event.message);
             // Add metadata.
-            if (event.meta)
-                compiled.push(util_1.inspect(event.meta, { colors: this.options.colorize }));
+            if (metaStyled && !this.options.prettyMeta)
+                compiled.push(metaStyled);
             // Add ministack if not error.
             if (level.miniStack) {
                 if (!event.error || (event.error && !this.options.stackTrace))
                     compiled.push(this.colorize(event.stack.miniStack, 'gray'));
             }
+            if (level.elapsedTime)
+                compiled.push(elapsedStyled);
             // Check for Symbol after.
             if (level && level.symbol && level.symbolPos === 'after')
                 compiled.push(this.colorize(level.symbol, level.symbolStyles));
+            if (metaStyled && this.options.prettyMeta)
+                compiled.push(EOL + metaStyled);
         }
         else {
             // Push message if has value.
             if (event.message && event.message.length)
                 compiled.push(event.message);
             // Add metadata.
-            if (event.meta)
-                compiled.push(util_1.inspect(event.meta, { colors: this.options.colorize }));
+            if (metaStyled) {
+                metaStyled = this.options.prettyMeta ? EOL + metaStyled : metaStyled;
+                compiled.push(metaStyled);
+            }
         }
         event.compiled = compiled;
         // Check for user defined before write method after compiling.
@@ -713,6 +820,8 @@ var Timbr = /** @class */ (function (_super) {
         if (event.index > event.activeIndex)
             return this;
         var msg = event.compiled.join(' ');
+        if (event.level.contentSytles && event.level.contentSytles.length)
+            msg = this.colorize(msg, event.level.contentSytles);
         if (type === 'write') {
             stream.write(msg);
         }

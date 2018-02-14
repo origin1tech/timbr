@@ -80,7 +80,14 @@ export declare class Timbr extends EventEmitter {
      * @param type the log level type.
      * @param offset additional offset.
      */
-    private pad(type, offset?, group?);
+    private pad(type, offset?);
+    /**
+     * Prettify Object
+     * Formats an object for display in terminal.
+     *
+     * @param obj the object to be prettified.
+     */
+    private prettifyObject(obj, padding);
     /**
      * Get
      * Gets a current option value.
@@ -121,6 +128,7 @@ export declare class Timbr extends EventEmitter {
     debugger(namespace?: string | ITimbrDebugOptions, options?: ITimbrDebugOptions): ITimbrDebug;
     readonly debuggers: {
         get: (namespace: string) => ITimbrDebug;
+        set: (namespace: string, key: string, val: any) => any;
         getAll: () => IMap<ITimbrDebug>;
         create: (namespace: string, options?: ITimbrDebugOptions) => void;
         enabled: (namespaceOrInstance: string | ITimbrDebug) => boolean;

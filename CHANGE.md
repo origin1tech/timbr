@@ -2,6 +2,14 @@
 
 List of changes by date/version.
 
+### 2.14.2018 (2.0.2)
+
+<table>
+  <tr><td>options.debugElapsed</td><td>allows for toggling elapsed time on debug messages.</td></tr>
+  <tr><td>options.prettyMeta</td><td>allow for pretty metadata nested below log message.</td></tr>
+  <tr><td>misc formatting fixes</td><td>various cosmetic fixes for better looking output.</td></tr>
+</table>
+
 ### 2.5.2018 (2.0.0 - 2.0.1)
 
 <table>

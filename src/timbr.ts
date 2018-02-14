@@ -3,7 +3,8 @@
 import { EventEmitter } from 'events';
 import { relative, parse } from 'path';
 import { Colurs, IColurs } from 'colurs';
-import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone, isWindows, isEmpty, split, isValue, isUndefined } from 'chek';
+import * as stringifyObj from 'stringify-object';
+import { extend, isDebug, keys, isBoolean, isPlainObject, isError, first, last, noop, isFunction, isNumber, toArray, toInteger, contains, isString, clone, isWindows, isEmpty, split, isValue, isUndefined, getType } from 'chek';
 import { IStacktraceFrame, IStacktraceResult, ITimbrEventData, ITimbrOptions, EventCallback, IMap, OptionKeys, AnsiStyles, ITimbrLevels, TimbrUnion, ITimbrLevel, ITimbr, TimestampCallback, ITimbrParsedEvent, TimestampFormat, ITimbrDebug, DebuggerOrNamespace, ITimbrDebugOptions } from './interfaces';
 import { format, inspect } from 'util';
 
@@ -21,6 +22,19 @@ const SYMBOLS = {
   ok: IS_SYMBOLS_SUPPORTED ? '✔' : '√'
 };
 
+const PRETTIFY_COLORS = {
+  number: 'yellow',
+  integer: 'yellow',
+  float: 'yellow',
+  boolean: 'yellow',
+  string: 'green',
+  date: 'magenta',
+  regexp: 'red',
+  null: 'bold',
+  undefined: 'gray',
+  function: 'cyan'
+};
+
 export const LOG_LEVELS = {
   error: ['bold', 'red'],
   warn: 'yellow',
@@ -34,10 +48,6 @@ export const LOG_LEVELS = {
   }
 };
 
-const DEBUG_DEFAULTS: ITimbrLevel = {
-  styles: 'blue'
-};
-
 export type LogLevelKeys = keyof typeof LOG_LEVELS;
 
 const DEFAULTS: ITimbrOptions = {
@@ -46,6 +56,7 @@ const DEFAULTS: ITimbrOptions = {
   colorize: true,         // whether or not to colorize output.
   labels: true,           // when true level label prefixes log message.
   padding: true,          // when true levels are padded on the left.
+  prettyMeta: false,    // when true metadata on new line prettified.
   timestamp: 'time',      // timestamp format date, time or false.
   timestampStyles: null,  // Ansi styles for colorizing.
   timestampLocale: 'en-US', // The locale for timestamps.
@@ -61,6 +72,7 @@ const DEFAULTS: ITimbrOptions = {
   miniStack: false,       // mini stack trace appended to message.
   debugLevel: 'debug',    // set a level as the default debugger.
   debugOnly: false,       // when debugging, only show debug level messages.
+  debugElapsed: true,     // when true debug messages show elapsed time in ms.
   beforeWrite: null       // Called before writing to stream for customizing output.
 };
 
@@ -116,7 +128,7 @@ export class Timbr extends EventEmitter {
       else
         this._activeDebuggers = active;
 
-      if (process.env.DEBUG_ONLY)
+      if (process.env.DEBUG_ONLY === 'true')
         this.options.debugOnly = true;
 
     }
@@ -148,7 +160,9 @@ export class Timbr extends EventEmitter {
       padding: this.options.padding,
       timestamp: this.options.timestamp,
       miniStack: this.options.miniStack,
-      indent: ''
+      indent: '',
+      contentStyles: null,
+      elapsedTime: true
     };
 
     for (const k in this._levels) {
@@ -383,7 +397,7 @@ export class Timbr extends EventEmitter {
    * @param type the log level type.
    * @param offset additional offset.
    */
-  private pad(type: string, offset?: number | string, group?: string) {
+  private pad(type: string, offset?: number | string) {
 
     if (!this.options.padding)
       return '';
@@ -398,7 +412,7 @@ export class Timbr extends EventEmitter {
     const debugLevels = (this._activeDebuggers || []).map(l => {
       if (l === 'default')
         return 'debug';
-      return `debug:${l}`;
+      return l;
     });
 
     let levels = [];
@@ -408,9 +422,6 @@ export class Timbr extends EventEmitter {
       if (level.label)
         levels.push(level.label);
     }
-
-    if (!group)
-      levels = levels.concat(debugLevels);
 
     i = levels.length;
 
@@ -423,6 +434,46 @@ export class Timbr extends EventEmitter {
 
     return padding;
 
+  }
+
+  /**
+   * Prettify Object
+   * Formats an object for display in terminal.
+   *
+   * @param obj the object to be prettified.
+   */
+  private prettifyObject(obj: any, padding: boolean) {
+
+    const self = this;
+    const colorKeys = keys(PRETTIFY_COLORS);
+
+    function transform(obj, prop, orig) {
+      let val = obj[prop];
+      let typed = getType(val);
+      if (~colorKeys.indexOf(typed)) {
+        const color = PRETTIFY_COLORS[typed];
+        return self.colorize(val, color);
+      }
+      else {
+        return orig;
+      }
+    }
+
+    let result = stringifyObj(obj, {
+      indent: '  ',
+      transform: transform
+    });
+
+    if (padding) {
+      let pad = this.pad('', 2);
+      result = result
+        .split('\n')
+        .map(v => pad + v)
+        .join('\n');
+    }
+
+
+    return result;
   }
 
   /**
@@ -497,7 +548,7 @@ export class Timbr extends EventEmitter {
   debugger(namespace?: string | ITimbrDebugOptions, options?: ITimbrDebugOptions): ITimbrDebug {
 
     const self = this;
-    let previous;
+    let previous, debug;
 
     if (isPlainObject(namespace)) {
       options = namespace as ITimbrDebugOptions;
@@ -506,32 +557,62 @@ export class Timbr extends EventEmitter {
 
     namespace = namespace || 'default';
 
+    const DEBUG_DEFAULTS = {
+      label: namespace,
+      styles: 'blue',
+      symbol: false,
+      symbolPos: 'after',
+      symbolStyles: null,
+      padding: this.options.padding,
+      timestamp: this.options.timestamp,
+      miniStack: this.options.miniStack,
+      indent: '',
+      contentStyles: null,
+      elapsedTime: this.options.debugElapsed
+    };
+
     // Check if debugger exists.
     if (this._debuggers[namespace as string])
       return this._debuggers[namespace as string];
 
     options = extend({}, DEBUG_DEFAULTS, options);
 
-    const debug: any = function (...args: any[]) {
+    debug = function (...args: any[]) {
 
-      if (!isDebug() || !~self._activeDebuggers.indexOf(namespace as string))
+      if (!isDebug() || (!~self._activeDebuggers.indexOf(namespace as string) && !~self._activeDebuggers.indexOf('*')))
         return self;
 
       const current = +new Date();
       const elapsed = current - (previous || current);
 
-      debug.previous = previous;
-      debug.current = current;
-      debug.elasped = elapsed;
+      debug.set('previous', previous);
+      debug.set('current', current);
+      debug.set('elapsed', elapsed);
+
       previous = current;
 
-      const event = self.parse(`debug:${namespace}`, ...args);
+      const event = self.parse(`debug:${debug.namespace}`, ...args);
 
       let msg = event.compiled.join(' ');
-      self.options.stream.write(msg + self.colorize(` (${elapsed}ms)`, debug.styles) + EOL);
+
+      // let elapsedTimeStr = self.colorize(`(${elapsed}ms)`, debug.styles);
+      // const compiled = [msg];
+      // if (debug.elapsedTime)
+      //   compiled.push(elapsedTimeStr);
+
+      // msg = compiled.join(' ');
+
+      // If content styles strip and colorize
+      if (debug.contentStyles && debug.contentStyles.length) {
+        msg = colurs.strip(msg);
+        msg = self.colorize(msg, debug.contentStyles);
+      }
+
+      // Write the message.
+      self.options.stream.write(msg + EOL);
 
       self.emit('debug', event.message, event);
-      self.emit(`${event.type}`, event.message, event);
+      self.emit(`debug:${event.type}`, event.message, event);
 
       event.fn(event.message, event);
 
@@ -541,20 +622,29 @@ export class Timbr extends EventEmitter {
 
     debug.namespace = namespace;
     debug.styles = options.styles;
-    debug.symbol = options.symbol || false;
-    debug.symbolPos = options.symbolPos || 'after';
+    debug.symbol = options.symbol;
+    debug.symbolPos = options.symbolPos;
     debug.symbolStyles = options.symbolStyles;
     debug.miniStack = options.miniStack;
     debug.timestamp = options.timestamp;
     debug.indent = options.indent;
+    debug.label = options.label;
+    debug.padding = options.padding;
+    debug.contentStyles = options.contentSytles;
+    debug.elapsedTime = options.elapsedTime;
 
     if (isUndefined(debug.symbolStyles) || (debug.symbolStyles && !debug.symbolStyles.length))
       debug.symbolStyles = debug.styles;
+
+    debug.elapsed = 0;
+    debug.current = 0;
+    debug.previous = 0;
 
     debug.enabled = self.debuggers.enabled.bind(self, namespace);
     debug.enable = self.debuggers.enable.bind(self, namespace);
     debug.disable = self.debuggers.disable.bind(self, namespace);
     debug.destroy = self.debuggers.destroy.bind(self, namespace);
+    debug.set = self.debuggers.set.bind(self, namespace);
 
     // Add to collection.
     this._debuggers[namespace as string] = debug;
@@ -581,6 +671,17 @@ export class Timbr extends EventEmitter {
       get: (namespace: string) => {
         const ns = toNamespace(namespace);
         return this._debuggers[ns];
+      },
+
+      /**
+       * Set
+       * Sets a value on an existing debugger.
+       */
+      set: (namespace: string, key: string, val: any) => {
+        const ns = toNamespace(namespace);
+        if (this._debuggers[ns])
+          this._debuggers[ns][key] = val;
+        return methods;
       },
 
       /**
@@ -679,11 +780,11 @@ export class Timbr extends EventEmitter {
     const subTypes = baseType.split(':');
     baseType = subTypes.length ? subTypes.shift() : null;
     const knownType = contains(this._levelKeys, baseType);
-    const debugr = baseType === 'debug' ? this.debuggers.get(subTypes[0]) : null;
+    const debugr = baseType === 'debug' ? this.debuggers.get(subTypes.join(':')) : null;
 
-    let stack: IStacktraceResult;
+    let stack: IStacktraceResult = {};
     let err, meta, ts, msg;
-    let event: ITimbrParsedEvent;
+    let event: ITimbrParsedEvent = {};
     let fn: EventCallback = noop;
 
     let prune = 0;
@@ -704,10 +805,6 @@ export class Timbr extends EventEmitter {
     let level: any = debugr ? debugr : this._levels[baseType] || null;
     const idx = this.getIndex(type);
     const activeIdx = this.getIndex(this.options.level);
-
-    // When debug ensure label is the type.
-    if (debugr)
-      level.label = type;
 
     // Check if last is callback.
     if (isFunction(last(clone))) {
@@ -771,7 +868,6 @@ export class Timbr extends EventEmitter {
 
     event = {
       type: type,
-      subTypes: subTypes,
       level: level,
       index: idx,
       activeIndex: activeIdx,
@@ -785,6 +881,22 @@ export class Timbr extends EventEmitter {
     };
 
     let compiled = [];
+
+    let metaStyled, elapsedStyled;
+
+    // Style metadata.
+    if (meta) {
+      if (!this.options.prettyMeta)
+        metaStyled = inspect(meta, { colors: this.options.colorize });
+      else
+        metaStyled = this.prettifyObject(meta, level.padding);
+    }
+
+    // Styled debug elapsed time.
+    if (debugr) {
+      elapsedStyled = this.colorize(`(${debugr.elapsed}ms)`, debugr.styles as AnsiStyles);
+    }
+
 
     // Ignore for write, writeLn and log levels.
     if (!/^write/.test(baseType) && baseType !== 'log') {
@@ -801,14 +913,20 @@ export class Timbr extends EventEmitter {
       if (level.label && event.type) {
         let label = level.label;
         let padding = '';
-        if (label === 'debug:default')
+        if (debugr && label === 'default')
           label = 'debug';
         if (level.padding)
-          padding = this.pad(label || '', null, level.group);
+          padding = this.pad(label || '', null);
         if (label && label.length) {
           label = this.colorize(padding + label + ':', level.styles as AnsiStyles[]);
           compiled.push(label);
         }
+      }
+      else {
+        // need to offset if using labels.
+        const offset = this.options.labels ? 1 : 0;
+        if (level.padding)
+          compiled.push(this.pad('', offset));
       }
 
       // Check for Symbol.
@@ -818,8 +936,8 @@ export class Timbr extends EventEmitter {
       compiled.push(event.message);
 
       // Add metadata.
-      if (event.meta)
-        compiled.push(inspect(event.meta, { colors: this.options.colorize }));
+      if (metaStyled && !this.options.prettyMeta)
+        compiled.push(metaStyled);
 
       // Add ministack if not error.
       if (level.miniStack) {
@@ -827,9 +945,15 @@ export class Timbr extends EventEmitter {
           compiled.push(this.colorize(event.stack.miniStack, 'gray'));
       }
 
+      if (level.elapsedTime)
+        compiled.push(elapsedStyled);
+
       // Check for Symbol after.
       if (level && level.symbol && level.symbolPos === 'after')
         compiled.push(this.colorize(level.symbol, level.symbolStyles));
+
+      if (metaStyled && this.options.prettyMeta)
+        compiled.push(EOL + metaStyled);
 
     }
     else {
@@ -839,8 +963,10 @@ export class Timbr extends EventEmitter {
         compiled.push(event.message);
 
       // Add metadata.
-      if (event.meta)
-        compiled.push(inspect(event.meta, { colors: this.options.colorize }));
+      if (metaStyled) {
+        metaStyled = this.options.prettyMeta ? EOL + metaStyled : metaStyled;
+        compiled.push(metaStyled);
+      }
 
     }
 
@@ -879,6 +1005,9 @@ export class Timbr extends EventEmitter {
       return this;
 
     let msg = event.compiled.join(' ');
+
+    if (event.level.contentSytles && event.level.contentSytles.length)
+      msg = this.colorize(msg, event.level.contentSytles);
 
     if (type === 'write') {
       stream.write(msg);

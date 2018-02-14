@@ -261,18 +261,17 @@ log.warn(<span class="hljs-string">'some message %s'</span>, warnSymbol);
 				<h4 id="timbr-event-object">Timbr Event Object</h4>
 				<p>Both event listeners and callbacks provide access to the TimbrEventData object which is created
 				when log arguments are parsed.</p>
-				<pre><code class="lang-ts">const event = {
-  type: &#39;the primary type like error, warn, info etc&#39;,
-  subTypes: &#39;debug:server would result in sub types of [&#39;server&#39;],
-  level: &#39;this is the log level or debug configuration options&#39;,
-  index: &#39;the integer or index of the log level being logged&#39;,
-  activeIndex: &#39;the integer of the active level, what you passed in your init options as the active level&#39;,
-  message: msg, // this gets updated after compile.
-  timestamp: &#39;the current timestamp&#39;,
-  meta: &#39;any metadata or object that was passed in the log message&#39;,
-  args: &#39;array containing the original arguments.&#39;,
-  error: &#39;when an error is logged the error instance will be stored here&#39;,
-  stack: &#39;the stack trace for the message being logged when no error present a stack is generated&#39;
+				<pre><code class="lang-ts"><span class="hljs-keyword">const</span> event = {
+  <span class="hljs-keyword">type</span>: <span class="hljs-string">'the primary type like error, warn, info etc'</span>,
+  level: <span class="hljs-string">'this is the log level or debug configuration options'</span>,
+  index: <span class="hljs-string">'the integer or index of the log level being logged'</span>,
+  activeIndex: <span class="hljs-string">'the integer of the active level, what you passed in your init options as the active level'</span>,
+  message: msg, <span class="hljs-comment">// this gets updated after compile.</span>
+  timestamp: <span class="hljs-string">'the current timestamp'</span>,
+  meta: <span class="hljs-string">'any metadata or object that was passed in the log message'</span>,
+  args: <span class="hljs-string">'array containing the original arguments.'</span>,
+  error: <span class="hljs-string">'when an error is logged the error instance will be stored here'</span>,
+  stack: <span class="hljs-string">'the stack trace for the message being logged when no error present a stack is generated'</span>
 };
 </code></pre>
 				<h4 id="on-log">On Log</h4>
@@ -306,6 +305,7 @@ log.warn(<span class="hljs-string">'some message %s'</span>, warnSymbol);
 						<tr><td>colorize</td><td>enables/disables colors.</td><td>boolean</td><td>true</td></tr>
 						<tr><td>labelLevels</td><td>when true log messages prefixed with level label.</td><td>boolean</td><td>true</td></tr>
 						<tr><td>padLevels</td><td>pads left of level.</td><td>boolean</td><td>true</td></tr>
+						<tr><td>prettyMeta</td><td>when true prettifies metadata on new line.</td><td>boolean</td><td>false</td></tr>
 						<tr><td>timestamp</td><td>enables/disables or defines timestamp type.</td><td>false | time | datetime | iso | Function</td><td>time</td></tr>
 						<tr><td>timestampStyles</td><td>colors/styles for stylizing timestamp</td><td>string | string[]</td><td>null</td></tr>
 						<tr><td>timestampLocale</td><td>the timestamp locale</td><td>string</td><td>en-US</td></tr>
@@ -320,6 +320,7 @@ log.warn(<span class="hljs-string">'some message %s'</span>, warnSymbol);
 						<tr><td>miniStack</td><td>when true file, line &amp; column shown on all messages.</td><td>boolean</td><td>true</td></tr>
 						<tr><td>debugLevel</td><td>the log level to use for default debugger.</td><td>string | false</td><td>debug</td></tr>
 						<tr><td>debugOnly</td><td>when true show only debug messages</td><td>boolean</td><td>false</td></tr>
+						<tr><td>debugElapsed</td><td>when true shows elapsed time in ms for debug messages.</td><td>boolean</td><td>true</td></tr>
 						<tr><td>beforeWrite</td><td>callback for customizing log output before writing to stream.</td><td>Function</td><td>null</td></tr>
 						<tbody>
 				</table>

@@ -303,7 +303,6 @@ when log arguments are parsed.
 ```ts
 const event = {
   type: 'the primary type like error, warn, info etc',
-  subTypes: 'debug:server would result in sub types of ['server'],
   level: 'this is the log level or debug configuration options',
   index: 'the integer or index of the log level being logged',
   activeIndex: 'the integer of the active level, what you passed in your init options as the active level',
@@ -361,6 +360,7 @@ log.on('debug:default', (message, event) => {
     <tr><td>colorize</td><td>enables/disables colors.</td><td>boolean</td><td>true</td></tr>
     <tr><td>labelLevels</td><td>when true log messages prefixed with level label.</td><td>boolean</td><td>true</td></tr>
     <tr><td>padLevels</td><td>pads left of level.</td><td>boolean</td><td>true</td></tr>
+    <tr><td>prettyMeta</td><td>when true prettifies metadata on new line.</td><td>boolean</td><td>false</td></tr>
     <tr><td>timestamp</td><td>enables/disables or defines timestamp type.</td><td>false | time | datetime | iso | Function</td><td>time</td></tr>
     <tr><td>timestampStyles</td><td>colors/styles for stylizing timestamp</td><td>string | string[]</td><td>null</td></tr>
     <tr><td>timestampLocale</td><td>the timestamp locale</td><td>string</td><td>en-US</td></tr>
@@ -375,6 +375,7 @@ log.on('debug:default', (message, event) => {
     <tr><td>miniStack</td><td>when true file, line & column shown on all messages.</td><td>boolean</td><td>true</td></tr>
     <tr><td>debugLevel</td><td>the log level to use for default debugger.</td><td>string | false</td><td>debug</td></tr>
     <tr><td>debugOnly</td><td>when true show only debug messages</td><td>boolean</td><td>false</td></tr>
+    <tr><td>debugElapsed</td><td>when true shows elapsed time in ms for debug messages.</td><td>boolean</td><td>true</td></tr>
     <tr><td>beforeWrite</td><td>callback for customizing log output before writing to stream.</td><td>Function</td><td>null</td></tr>
   <tbody>
 </table>

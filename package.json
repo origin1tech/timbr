@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "chek": "^1.1.6",
-    "colurs": "^1.0.12"
+    "colurs": "^1.0.12",
+    "stringify-object": "^3.2.2"
   }
 }
