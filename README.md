@@ -27,6 +27,7 @@ OR
 
 ```ts
 import * as timbr from 'timbr';
+
 const LOG_LEVELS = {
   emerg: ['bgRed', 'yellow'],
   alert: ['underline', 'bold', 'red'],
@@ -44,12 +45,14 @@ const LOG_LEVELS = {
 }
 
 const LogLevelKeys = keyof typeof LOG_LEVELS;
-const log = timbr.create<LogLevelKeys>({ /* your options */}, methods);
+const log = timbr.create<LogLevelKeys>({ /* your options */}, LOG_LEVELS);
+```
 
-// NOTE: When NOT using Typescript you can create your logger instance
-// by simply passing your options and log levels/methods (see below).
+**NOTE: When NOT using Typescript you can create your logger instance
+by simply passing your options and log levels/methods (see below).**
 
-const log = timbr.create({ /* options */}, methods);
+```ts
+const log = timbr.create({ /* options */}, LOG_LEVELS);
 ```
 
 #### Log a Message
