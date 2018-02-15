@@ -1,9 +1,21 @@
-import { init } from './timbr';
+import { init, create } from './timbr';
 
-const log = init({ miniStack: true, level: 'verbose' });
+const LEVELS = {
+  fatal: {
+    label: 'FATAL',
+    styles: ['bold', 'red']
+  },
+  warn: {
+    label: 'WARNING',
+    styles: 'yellow'
+  },
+  create: {
+    label: 'CREATE',
+    styles: 'green'
+  }
+};
 
-// const debug = log.debugger('custom', { styles: ['magenta'] });
-log.debug('format %s times', 'msg');
-log('test');
-log('other');
+type LevelKeys = keyof typeof LEVELS;
+
+const log = create<LevelKeys>({ miniStack: true, level: 'verbose' }, LEVELS);
 

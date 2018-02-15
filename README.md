@@ -28,6 +28,13 @@ OR
 ```ts
 import * as timbr from 'timbr';
 
+// IMPORTANT: When using Typescript do NOT
+// define your custom log levels as ITimbrLevel.
+// In order for the "keyof typeof" trick to work
+// with record it can't be typed with the interface
+// this will be applied internally in Timbr's instance.
+// Just define as plain object and you'll be good.
+
 const LOG_LEVELS = {
   emerg: ['bgRed', 'yellow'],
   alert: ['underline', 'bold', 'red'],

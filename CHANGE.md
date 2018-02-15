@@ -2,9 +2,10 @@
 
 List of changes by date/version.
 
-### 2.14.2018 (2.0.2-2.0.3)
+### 2.14.2018 (2.0.2-2.0.4)
 
 <table>
+  <tr><td>typings</td><td>fix typings issue.</td></tr>
   <tr><td>README.md</td><td>update README.</td></tr>
   <tr><td>options.debugElapsed</td><td>allows for toggling elapsed time on debug messages.</td></tr>
   <tr><td>options.prettyMeta</td><td>allow for pretty metadata nested below log message.</td></tr>

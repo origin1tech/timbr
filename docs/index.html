@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>App</title>
+	<title>Timbr</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="assets/css/main.css">
@@ -22,7 +22,7 @@
 						<li class="state loading">Preparing search index...</li>
 						<li class="state failure">The search index is not available</li>
 					</ul>
-					<a href="index.html" class="title">App</a>
+					<a href="index.html" class="title">Timbr</a>
 				</div>
 				<div class="table-cell" id="tsd-widgets">
 					<div id="tsd-filter">
@@ -56,7 +56,7 @@
 					<a href="globals.html">Globals</a>
 				</li>
 			</ul>
-			<h1> App</h1>
+			<h1> Timbr</h1>
 		</div>
 	</div>
 </header>
@@ -79,6 +79,14 @@
 </code></pre>
 				<p>OR</p>
 				<pre><code class="lang-ts"><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> timbr <span class="hljs-keyword">from</span> <span class="hljs-string">'timbr'</span>;
+
+<span class="hljs-comment">// IMPORTANT: When using Typescript do NOT</span>
+<span class="hljs-comment">// define your custom log levels as ITimbrLevel.</span>
+<span class="hljs-comment">// In order for the "keyof typeof" trick to work</span>
+<span class="hljs-comment">// with record it can't be typed with the interface</span>
+<span class="hljs-comment">// this will be applied internally in Timbr's instance.</span>
+<span class="hljs-comment">// Just define as plain object and you'll be good.</span>
+
 <span class="hljs-keyword">const</span> LOG_LEVELS = {
   emerg: [<span class="hljs-string">'bgRed'</span>, <span class="hljs-string">'yellow'</span>],
   alert: [<span class="hljs-string">'underline'</span>, <span class="hljs-string">'bold'</span>, <span class="hljs-string">'red'</span>],
@@ -96,12 +104,11 @@
 }
 
 <span class="hljs-keyword">const</span> LogLevelKeys = keyof <span class="hljs-keyword">typeof</span> LOG_LEVELS;
-<span class="hljs-keyword">const</span> log = timbr.create&lt;LogLevelKeys&gt;({ <span class="hljs-comment">/* your options */</span>}, methods);
-
-<span class="hljs-comment">// <span class="hljs-doctag">NOTE:</span> When NOT using Typescript you can create your logger instance</span>
-<span class="hljs-comment">// by simply passing your options and log levels/methods (see below).</span>
-
-<span class="hljs-keyword">const</span> log = timbr.create({ <span class="hljs-comment">/* options */</span>}, methods);
+<span class="hljs-keyword">const</span> log = timbr.create&lt;LogLevelKeys&gt;({ <span class="hljs-comment">/* your options */</span>}, LOG_LEVELS);
+</code></pre>
+				<p><strong>NOTE: When NOT using Typescript you can create your logger instance
+				by simply passing your options and log levels/methods (see below).</strong></p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">const</span> log = timbr.create({ <span class="hljs-comment">/* options */</span>}, LOG_LEVELS);
 </code></pre>
 				<h4 id="log-a-message">Log a Message</h4>
 				<pre><code class="lang-ts">log.warn(<span class="hljs-string">'some warning.'</span>);

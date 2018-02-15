@@ -844,8 +844,9 @@ export class Timbr extends EventEmitter {
 
     suffixArgs.forEach((v, i) => {
       if (isPlainObject(v))
-        tmpMeta = Object.assign(tmpMeta, v);
+        tmpMeta = extend(tmpMeta, v);
     });
+
     suffixArgs = suffixArgs.filter(v => !isPlainObject(v));
 
     if (suffixArgs.length)

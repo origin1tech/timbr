@@ -689,7 +689,7 @@ var Timbr = /** @class */ (function (_super) {
         // Inspect suffix args for metadata.
         suffixArgs.forEach(function (v, i) {
             if (chek_1.isPlainObject(v))
-                tmpMeta = Object.assign(tmpMeta, v);
+                tmpMeta = chek_1.extend(tmpMeta, v);
         });
         suffixArgs = suffixArgs.filter(function (v) { return !chek_1.isPlainObject(v); });
         if (suffixArgs.length)
